@@ -24,28 +24,32 @@ const props = defineProps({
   videoId: { type: String, required: true }
 });
 function reloadStream() {
-  fetchStreamUrl(props.videoId);
+  fetchStream(props.videoId);
 }
 
 const streamUrl = ref("");
 const error = ref("");
 const loading = ref(false);
 
-
-function fetchStreamUrl(id) {
+function fetchStream(id) {
   streamUrl.value = "";
   error.value = "";
   loading.value = true;
 
   const jsonUrl = `${apiurl()}?stream=${id}`;
-  let fetched = false;
 
-  fetch(jsonUrl, { credentials: "omit" })
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, 60000); // 60s timeout
+
+  fetch(jsonUrl, { credentials: "omit", signal: controller.signal })
     .then(res => {
-      if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
-        return res.json();
-      }
-      throw new Error("Not JSON");
+      clearTimeout(timeoutId);
+      if (!res.ok) throw new Error("HTTP error");
+      const ct = res.headers.get("content-type") || "";
+      if (!ct.includes("application/json")) throw new Error("Not JSON");
+      return res.json();
     })
     .then(data => {
       loading.value = false;
@@ -54,56 +58,21 @@ function fetchStreamUrl(id) {
       } else {
         error.value = "ストリームURLが空です (JSON)";
       }
-      fetched = true;
     })
-    .catch(() => {
-      if (fetched) return;
-
-      // ランダムなコールバック関数名を生成
-      const cbName = "jsonp_cb_" + Math.random().toString(36).slice(2, 10);
-
-      // タイムアウト用
-      let timeoutId;
-
-      // コールバック関数をwindowに登録
-      window[cbName] = function(data) {
-        clearTimeout(timeoutId);
-        loading.value = false;
-        if (data && data.url) {
-          streamUrl.value = data.url;
-        } else {
-          error.value = "ストリームURLが空です (JSONP)";
-        }
-        cleanup();
-      };
-
-      function cleanup() {
-        if (script.parentNode) script.parentNode.removeChild(script);
-        delete window[cbName];
-      }
-
-      timeoutId = setTimeout(() => {
-        loading.value = false;
+    .catch(err => {
+      loading.value = false;
+      if (err.name === "AbortError") {
         error.value = "ストリームURLの取得に失敗しました (タイムアウト)";
-        cleanup();
-      }, 60000); 
-
-      const script = document.createElement("script");
-      script.src = `${jsonUrl}&callback=${cbName}`;
-      script.onerror = function() {
-        clearTimeout(timeoutId);
-        loading.value = false;
-        error.value = "ストリームURLの取得に失敗しました (script error)";
-        cleanup();
-      };
-      document.body.appendChild(script);
+      } else {
+        error.value = "ストリームURLの取得に失敗しました (fetch error)";
+      }
     });
 }
 
 watch(
   () => props.videoId,
   (newId) => {
-    if (newId) fetchStreamUrl(newId);
+    if (newId) fetchStream(newId);
   },
   { immediate: true }
 );

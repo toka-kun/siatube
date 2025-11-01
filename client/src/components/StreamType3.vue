@@ -46,6 +46,35 @@
                 <a :href="item.url" target="_blank" rel="noopener" download>ダウンロード</a>
               </div>
             </div>
+
+            <!-- m3u8 raw -->
+            <div class="option" v-if="m3u8RawList.length">
+              <strong>m3u8　<span style="font-weight: normal;">直接のダウンロードはできません</span>:</strong>
+              <div v-for="u in m3u8RawList" :key="u.url" class="m3u8-row">
+                <div class="meta">
+                  {{ u.resolution || "-" }}
+                </div>
+                <button class="copy-link" @click="copyUrl(u.url)">
+                  <span class="url-line">{{ u.url }}</span>
+                </button>
+                <span class="copied" v-if="lastCopied === u.url">コピーしました</span>
+              </div>
+            </div>
+
+            <!-- m3u8 proxy -->
+            <div class="option" v-if="m3u8ProxyList.length">
+              <strong>m3u8（proxy）<span style="font-weight: normal;">*外部サイトとの併用でダウンロード可能:</span></strong>
+              <div v-for="u in m3u8ProxyList" :key="u.url" class="m3u8-row">
+                <div class="meta">
+                  {{ u.resolution || "-" }}
+                </div>
+                <button class="copy-link" @click="copyUrl(u.url)">
+                  <span class="url-line">{{ u.url }}</span>
+                </button>
+                <span class="copied" v-if="lastCopied === u.url">コピーしました</span>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
@@ -69,6 +98,9 @@ const loading = ref(false);
 const muxed360pList = ref([]);
 const audioOnlyList = ref([]);
 const videoOnlyList = ref([]);
+const m3u8RawList = ref([]);
+const m3u8ProxyList = ref([]);
+const lastCopied = ref("");
 
 function openPopup() {
   popupVisible.value = true;
@@ -83,95 +115,93 @@ function closePopup() {
   muxed360pList.value = [];
   audioOnlyList.value = [];
   videoOnlyList.value = [];
+  m3u8RawList.value = [];
+  m3u8ProxyList.value = [];
   error.value = "";
+  lastCopied.value = "";
 }
 
 async function fetchStream() {
   loading.value = true;
   error.value = "";
-  let fetched = false;
+  streamData.value = null;
+
   const jsonUrl = `https://script.google.com/macros/s/AKfycbwUuvKAcomprFysE2SFaZrPTHB6Rmhi0ptjQYHzWnoOGyIMA8gMKcOEW_Nz11u695Xv_Q/exec?id=${props.videoId}`;
+
   try {
     const res = await fetch(jsonUrl, { credentials: "omit" });
-    if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
-      const data = await res.json();
-      streamData.value = data;
-      fetched = true;
-
-      muxed360pList.value = [];
-      if (Array.isArray(data["audio&video"])) {
-        muxed360pList.value = data["audio&video"].filter(v => v.resolution === "360p").map(v => ({ url: v.url }));
-        if (muxed360pList.value.length === 0) {
-          muxed360pList.value = data["audio&video"].map(v => ({ url: v.url }));
-        }
-      }
-
-      // 音声のみ
-      audioOnlyList.value = [];
-      if (Array.isArray(data["audio only"])) {
-        audioOnlyList.value = data["audio only"].map(v => ({ ext: v.ext, url: v.url }));
-      }
-
-      // 映像のみ
-      videoOnlyList.value = [];
-      if (Array.isArray(data["video only"])) {
-        videoOnlyList.value = data["video only"].map(v => ({ resolution: v.resolution, ext: v.ext, url: v.url }));
-      }
-    } else {
-      throw new Error("Not JSON");
+    if (!res.ok || !res.headers.get("content-type")?.includes("application/json")) {
+      throw new Error("Not JSON response");
     }
+    const data = await res.json();
+    streamData.value = data;
+
+    // muxed 360p
+    muxed360pList.value = [];
+    if (Array.isArray(data["audio&video"])) {
+      muxed360pList.value = data["audio&video"].filter(v => v.resolution === "360p").map(v => ({ url: v.url }));
+      if (muxed360pList.value.length === 0) {
+        muxed360pList.value = data["audio&video"].map(v => ({ url: v.url }));
+      }
+    }
+
+    // audio only
+    audioOnlyList.value = [];
+    if (Array.isArray(data["audio only"])) {
+      audioOnlyList.value = data["audio only"].map(v => ({ ext: v.ext, url: v.url }));
+    }
+
+    // video only
+    videoOnlyList.value = [];
+    if (Array.isArray(data["video only"])) {
+      videoOnlyList.value = data["video only"].map(v => ({ resolution: v.resolution, ext: v.ext, url: v.url }));
+    }
+
+    // m3u8 raw
+    m3u8RawList.value = [];
+    if (Array.isArray(data["m3u8 raw"])) {
+      m3u8RawList.value = data["m3u8 raw"].map(v => ({ url: v.url, resolution: v.resolution }));
+    }
+
+    // m3u8 proxy
+    m3u8ProxyList.value = [];
+    if (Array.isArray(data["m3u8 proxy"])) {
+      m3u8ProxyList.value = data["m3u8 proxy"].map(v => ({ url: v.url, resolution: v.resolution }));
+    }
+
   } catch (e) {
-    if (fetched) return;
-    const cbName = "jsonp_stream_" + Math.random().toString(36).slice(2, 10);
-    let timeoutId;
-    window[cbName] = function(data) {
-      clearTimeout(timeoutId);
-      streamData.value = data;
-
-      muxed360pList.value = [];
-      if (Array.isArray(data["audio&video"])) {
-        muxed360pList.value = data["audio&video"].filter(v => v.resolution === "360p").map(v => ({ url: v.url }));
-        if (muxed360pList.value.length === 0) {
-          muxed360pList.value = data["audio&video"].map(v => ({ url: v.url }));
-        }
-      }
-
-      // 音声のみ
-      audioOnlyList.value = [];
-      if (Array.isArray(data["audio only"])) {
-        audioOnlyList.value = data["audio only"].map(v => ({ ext: v.ext, url: v.url }));
-      }
-
-      // 映像のみ
-      videoOnlyList.value = [];
-      if (Array.isArray(data["video only"])) {
-        videoOnlyList.value = data["video only"].map(v => ({ resolution: v.resolution, ext: v.ext, url: v.url }));
-      }
-
-      loading.value = false;
-      cleanup();
-    };
-    function cleanup() {
-      try { if (script.parentNode) script.parentNode.removeChild(script); } catch (e) {}
-      try { delete window[cbName]; } catch (e) { window[cbName] = undefined; }
-    }
-    const script = document.createElement("script");
-    script.src = `${jsonUrl}&callback=${cbName}`;
-    script.onerror = function() {
-      clearTimeout(timeoutId);
-      loading.value = false;
-      error.value = "ストリームの取得に失敗しました (script error)";
-      cleanup();
-    };
-    timeoutId = setTimeout(() => {
-      loading.value = false;
-      error.value = "ストリームの取得に失敗しました (タイムアウト)";
-      cleanup();
-    }, 30000);
-    document.body.appendChild(script);
-    return;
+    error.value = "ストリームの取得に失敗しました（fetch error）";
+    streamData.value = null;
+    muxed360pList.value = [];
+    audioOnlyList.value = [];
+    videoOnlyList.value = [];
+    m3u8RawList.value = [];
+    m3u8ProxyList.value = [];
+  } finally {
+    loading.value = false;
   }
-  loading.value = false;
+}
+
+async function copyUrl(url) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(url);
+    } else {
+      const ta = document.createElement("textarea");
+      ta.value = url;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
+    lastCopied.value = url;
+    setTimeout(() => {
+      if (lastCopied.value === url) lastCopied.value = "";
+    }, 1500);
+  } catch (e) {
+    // ignore silently
+    lastCopied.value = "";
+  }
 }
 </script>
 
@@ -245,5 +275,49 @@ async function fetchStream() {
 }
 .retry-btn:hover {
   background: #666;
+}
+
+/* m3u8 表示のスタイル */
+.m3u8-row {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.meta {
+  font-size: 12px;
+  color: #444;
+}
+
+/* m3u8のURL */
+.copy-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+}
+.url-line {
+  display: block;
+  white-space: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+  font-family: monospace;
+  font-size: 12px;
+  color: #0066cc;
+  text-decoration: underline;
+  background: #f6f6f6;
+  padding: 6px;
+  border-radius: 4px;
+}
+
+/* コピー済み表示 */
+.copied {
+  font-size: 12px;
+  color: #2a8a2a;
+  margin-top: 4px;
 }
 </style>
