@@ -22,53 +22,14 @@
 
       <div class="settings-box" v-show="settingsVisible">
         <label>
-          画質:
-          <select v-model="selectedQuality" class="selector">
-            <option v-for="q in availableQualities" :key="q" :value="q">
-              {{ q.replace('p', '') }}p
-            </option>
-          </select>
+          繰り返し:
+          <input type="checkbox" v-model="repeatEnabled" />
+        </label>
+        <label :class="{ 'autoplay-disabled': repeatEnabled }">
+          自動再生:
+          <input type="checkbox" v-model="autoplayEnabled" :disabled="repeatEnabled" />
         </label>
 
-        <!-- 非 Apple デバイスでは再生速度選択を常に表示 -->
-        <label v-if="!isAppleDevice()">
-          再生速度:
-          <select v-model.number="selectedPlaybackRate" class="selector">
-            <option v-for="rate in playbackRates" :key="rate" :value="rate">
-              {{ rate }}x
-            </option>
-          </select>
-        </label>
-
-        <details class="other-settings">
-          <summary>その他</summary>
-          <label>
-            繰り返し:
-            <input type="checkbox" v-model="repeatEnabled" />
-          </label>
-          <label :class="{ 'autoplay-disabled': repeatEnabled }">
-            自動再生:
-            <input type="checkbox" v-model="autoplayEnabled" :disabled="repeatEnabled" />
-          </label>
-        </details>
-        <button @click="reloadStream" class="reload-button">再読込み</button>
-      </div>
-      <div v-if="isQualitySwitching" class="block-overlay" aria-hidden="true"></div>
-    </template>
-
-    <!-- その他: videourl (video+audio) の再生 -->
-    <template v-else>
-      <video ref="videoRef" preload="auto" autoplay controls>
-        <source :src="sources[selectedQuality]?.video?.url" :type="sources[selectedQuality]?.video?.mimeType" />
-      </video>
-      <div v-if="showUnmutePrompt" class="unmute-prompt" @click.stop="handleUnmuteClick">
-        ミュートを解除する
-      </div>
-      <audio ref="audioRef" preload="auto" style="display:none;" autoplay>
-        <source :src="sources[selectedQuality]?.audio?.url" :type="sources[selectedQuality]?.audio?.mimeType" />
-      </audio>
-
-      <div class="settings-box" v-show="settingsVisible">
         <label>
           画質:
           <select v-model="selectedQuality" class="selector">
@@ -88,17 +49,52 @@
           </select>
         </label>
 
-        <details class="other-settings">
-          <summary>その他</summary>
-          <label>
-            繰り返し:
-            <input type="checkbox" v-model="repeatEnabled" />
-          </label>
-          <label :class="{ 'autoplay-disabled': repeatEnabled }">
-            自動再生:
-              <input type="checkbox" v-model="autoplayEnabled" :disabled="repeatEnabled" />
-          </label>
-        </details>
+        <button @click="reloadStream" class="reload-button">再読込み</button>
+      </div>
+      <div v-if="isQualitySwitching" class="block-overlay" aria-hidden="true"></div>
+    </template>
+
+    <!-- その他: videourl (video+audio) の再生 -->
+    <template v-else>
+      <video ref="videoRef" preload="auto" autoplay controls>
+        <source :src="sources[selectedQuality]?.video?.url" :type="sources[selectedQuality]?.video?.mimeType" />
+      </video>
+      <div v-if="showUnmutePrompt" class="unmute-prompt" @click.stop="handleUnmuteClick">
+        ミュートを解除する
+      </div>
+      <audio ref="audioRef" preload="auto" style="display:none;" autoplay>
+        <source :src="sources[selectedQuality]?.audio?.url" :type="sources[selectedQuality]?.audio?.mimeType" />
+      </audio>
+
+      <div class="settings-box" v-show="settingsVisible">
+        <label>
+          繰り返し:
+          <input type="checkbox" v-model="repeatEnabled" />
+        </label>
+        <label :class="{ 'autoplay-disabled': repeatEnabled }">
+          自動再生:
+            <input type="checkbox" v-model="autoplayEnabled" :disabled="repeatEnabled" />
+        </label>
+
+        <label>
+          画質:
+          <select v-model="selectedQuality" class="selector">
+            <option v-for="q in availableQualities" :key="q" :value="q">
+              {{ q.replace('p', '') }}p
+            </option>
+          </select>
+        </label>
+
+        <!-- 非 Apple デバイスでは再生速度選択を常に表示 -->
+        <label v-if="!isAppleDevice()">
+          再生速度:
+          <select v-model.number="selectedPlaybackRate" class="selector">
+            <option v-for="rate in playbackRates" :key="rate" :value="rate">
+              {{ rate }}x
+            </option>
+          </select>
+        </label>
+
         <button @click="reloadStream" class="reload-button">再読込み</button>
       </div>
       <div v-if="isQualitySwitching" class="block-overlay" aria-hidden="true"></div>
@@ -130,7 +126,8 @@ const diffText = ref("0");
 const videoRef = ref(null);
 const audioRef = ref(null);
 const repeatEnabled = ref(false);
-const autoplayEnabled = ref(true);
+// デフォルトはオフにする
+const autoplayEnabled = ref(false);
 const loading = ref(false);
 const isQualitySwitching = ref(false);
 const showUnmutePrompt = ref(false);
@@ -145,6 +142,94 @@ let _loopBufferListenersAttached = false;
 const BUFFER_RESUME_SECONDS = 4;
 let _onEndedAttached = false;
 let _onEnded = () => { try { emit('ended'); } catch (e) {} };
+
+// 再生履歴（直近3件）管理用キー
+const PLAY_HISTORY_KEY = 'yt_play_history_v1';
+// プリフェッチキャッシュ
+const prefetchCache = {};
+
+function loadPlayHistory() {
+  try {
+    const s = localStorage.getItem(PLAY_HISTORY_KEY);
+    return s ? JSON.parse(s) : [];
+  } catch (e) { return []; }
+}
+
+function savePlayHistory(arr) {
+  try { localStorage.setItem(PLAY_HISTORY_KEY, JSON.stringify(arr.slice(-3))); } catch (e) {}
+}
+
+function pushToHistory(id) {
+  if (!id) return;
+  try {
+    const h = loadPlayHistory();
+    if (h[h.length - 1] === id) return;
+    h.push(id);
+    savePlayHistory(h);
+  } catch (e) {}
+}
+
+// 自動再生候補選定
+// window.__autoplayCandidates (配列) があればそこから選ぶ
+// DOM 上に data-video-id 属性を持つ要素があれば上から選ぶ
+function getAutoplayCandidateId() {
+  try {
+    const recent = new Set(loadPlayHistory());
+    // avoid current video
+    recent.add(props.videoId);
+
+    // list
+    if (Array.isArray(window.__autoplayCandidates)) {
+      for (const id of window.__autoplayCandidates) {
+        if (!recent.has(id) && id) return id;
+      }
+    }
+
+    // DOM: elements with data-video-id
+    const els = document.querySelectorAll('[data-video-id]');
+    for (const el of els) {
+      const id = el.getAttribute('data-video-id');
+      if (id && !recent.has(id)) return id;
+    }
+  } catch (e) {}
+  return null;
+}
+
+async function prefetchCandidate(id) {
+  if (!id) return null;
+  if (prefetchCache[id]) return prefetchCache[id];
+  try {
+    const data = await apiRequest({ params: { stream2: id }, retries: 1, timeout: 30000, jsonpFallback: false });
+    prefetchCache[id] = data;
+    return data;
+  } catch (e) {
+    return null;
+  }
+}
+
+// 保証付きで候補をプリフェッチして id を返す
+async function ensurePrefetchedCandidate() {
+  try {
+    const id = getAutoplayCandidateId();
+    if (!id) return null;
+    if (!prefetchCache[id]) {
+      await prefetchCandidate(id);
+    }
+    return id;
+  } catch (e) { return null; }
+}
+
+// ended 時の処理: 終了イベント発行 + 自動再生が有効ならプリフェッチ済み候補を再生リクエスト
+_onEnded = async () => {
+  try { emit('ended'); } catch (e) {}
+  try { pushToHistory(props.videoId); } catch (e) {}
+  if (!autoplayEnabled.value) return;
+  try {
+    const candId = await ensurePrefetchedCandidate();
+    if (!candId) return;
+    emit('play-autoplay-candidate', { id: candId, prefetched: prefetchCache[candId] || null });
+  } catch (e) {}
+};
 
 const nativeHlsSupported = ref(false);
 const hasM3u8 = ref(false);
@@ -732,6 +817,13 @@ async function fetchStreamUrl(id) {
         }
       }
     });
+
+    // 自動再生が有効なら事前に候補をプリフェッチ（親が候補リストを提供している場合などに有効）
+    try {
+      if (autoplayEnabled.value) {
+        ensurePrefetchedCandidate();
+      }
+    } catch (e) {}
 
   } catch (err) {
     loading.value = false;

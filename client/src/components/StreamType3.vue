@@ -17,7 +17,7 @@
       </div>
 
       <div v-else>
-        <h3>ダウンロードオプション ID={{props.videoId}}</h3>
+        <h3>ダウンロード</h3>
 
         <div class="main-flex-row">
           <div class="main-options">
@@ -47,10 +47,10 @@
               </div>
             </div>
 
-            <!-- m3u8 raw -->
-            <div class="option" v-if="m3u8RawList.length">
-              <strong>m3u8　<span style="font-weight: normal;">直接のダウンロードはできません</span>:</strong>
-              <div v-for="u in m3u8RawList" :key="u.url" class="m3u8-row">
+            <!-- m3u8 proxy -->
+            <div class="option" v-if="m3u8ProxyList.length">
+              <strong>m3u8（proxy）<span style="font-weight: normal;">*外部サイト(m3u8ダウンロードサイトで検索)との併用でダウンロード可能:</span></strong>
+              <div v-for="u in m3u8ProxyList" :key="u.url" class="m3u8-row">
                 <div class="meta">
                   {{ u.resolution || "-" }}
                 </div>
@@ -61,10 +61,10 @@
               </div>
             </div>
 
-            <!-- m3u8 proxy -->
-            <div class="option" v-if="m3u8ProxyList.length">
-              <strong>m3u8（proxy）<span style="font-weight: normal;">*外部サイトとの併用でダウンロード可能:</span></strong>
-              <div v-for="u in m3u8ProxyList" :key="u.url" class="m3u8-row">
+            <!-- m3u8 raw -->
+            <div class="option" v-if="m3u8RawList.length">
+              <strong>m3u8　<span style="font-weight: normal;">直接のダウンロードはできません</span>:</strong>
+              <div v-for="u in m3u8RawList" :key="u.url" class="m3u8-row">
                 <div class="meta">
                   {{ u.resolution || "-" }}
                 </div>
@@ -84,8 +84,6 @@
 
 <script setup>
 import { ref } from "vue";
-import { apiRequest } from "@/services/requestManager";
-import { apiurl } from "@/api"; // フォールバック用（getEffectiveApiUrl が壊れた場合）
 
 const props = defineProps({
   videoId: { type: String, required: true }
@@ -128,36 +126,21 @@ async function fetchStream() {
   streamData.value = null;
 
   try {
-    // 中央化された apiRequest を使用
-    const data = await apiRequest({
-      params: { id: props.videoId },
-      retries: 1,
-      timeout: 15000,
-      jsonpFallback: false,
-    });
-
-    // API から正しく JSON が来た場合
-    streamData.value = data;
-
-  } catch (e) {
-    // フォールバック: 既存の固定スクリプトURL に直接 fetch を試す（既存動作を壊さないため）
-    try {
-      const fallbackUrl = `https://script.google.com/macros/s/AKfycbwUuvKAcomprFysE2SFaZrPTHB6Rmhi0ptjQYHzWnoOGyIMA8gMKcOEW_Nz11u695Xv_Q/exec?id=${encodeURIComponent(props.videoId)}`;
-      const res = await fetch(fallbackUrl, { credentials: "omit" });
-      if (!res.ok || !res.headers.get("content-type")?.includes("application/json")) {
-        throw new Error("Not JSON response (fallback)");
-      }
-      const data2 = await res.json();
-      streamData.value = data2;
-    } catch (e2) {
-      error.value = "ストリームの取得に失敗しました（fetch error）";
-      streamData.value = null;
-      muxed360pList.value = [];
-      audioOnlyList.value = [];
-      videoOnlyList.value = [];
-      m3u8RawList.value = [];
-      m3u8ProxyList.value = [];
+    const fallbackUrl = `https://script.google.com/macros/s/AKfycbwUuvKAcomprFysE2SFaZrPTHB6Rmhi0ptjQYHzWnoOGyIMA8gMKcOEW_Nz11u695Xv_Q/exec?id=${encodeURIComponent(props.videoId)}`;
+    const res = await fetch(fallbackUrl, { credentials: "omit" });
+    if (!res.ok || !res.headers.get("content-type")?.includes("application/json")) {
+      throw new Error("Not JSON response");
     }
+    const data = await res.json();
+    streamData.value = data;
+  } catch (e) {
+    error.value = "ストリームの取得に失敗しました（fetch error）";
+    streamData.value = null;
+    muxed360pList.value = [];
+    audioOnlyList.value = [];
+    videoOnlyList.value = [];
+    m3u8RawList.value = [];
+    m3u8ProxyList.value = [];
   } finally {
     // 共通の後処理（data がセットされていれば下でマップ処理）
     if (streamData.value) {
