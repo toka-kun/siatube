@@ -2,7 +2,7 @@
   <div class="page-container">
     <div class="main-content" v-if="video">
       <div class="video-wrapper">
-        <StreamPlayer :videoId="videoId" :streamType="resolvedStreamType" @ended="onPlayerEnded" @play-autoplay-candidate="onPlayAutoplayCandidate" />
+        <StreamPlayer :videoId="videoId" :streamType="resolvedStreamType" @ended="onPlayerEnded" @play-autoplay-candidate="onPlayAutoplayCandidate" @autoplay-no-suitable-video="onAutoplayNoSuitableVideo" />
       </div>
 
       <h1 class="video-title" ref="videoTitle">{{ title }}</h1>
@@ -112,6 +112,8 @@
           v-for="r in relatedVideos"
           :key="r.videoId"
           class="related-item"
+          :data-video-id="r.videoId"
+          :data-duration="`${r.duration}`"
           @mouseenter="hoverId = r.videoId"
           @mouseleave="hoverId = null"
         >
@@ -131,7 +133,7 @@
                   'badge-live': r.badge.toLowerCase().includes('ライブ'),
                 }"
               >
-                {{ r.badge }}
+                {{ r.badge }} <!-- duration: {{ r.duration }}s -->
               </span>
             </div>
           </router-link>
@@ -153,6 +155,12 @@
       <button class="reload-btn" @click="reloadVideo">再取得</button>
     </div>
     <p v-else class="loading-msg">読み込み中...<br>読み込む速度を早くする方法。↓<br>右上の設定マークからカスタムエンドポイントのを追加してください　＊方法は簡単で1~3分で作れます。</p>
+
+    <!-- 自動再生フィルタ通知 -->
+    <div v-if="showAutoplayNotification" class="autoplay-notification">
+      <span class="notification-text">{{ autoplayNotificationMessage }}</span>
+      <button class="notification-close" @click="showAutoplayNotification = false">×</button>
+    </div>
   </div>
 </template>
 
@@ -190,9 +198,12 @@ export default {
       error: null,
       hoverId: null,
       showFullDescription: false,
-      localStreamType: this.getCookieSafe("StreamType") || "1",
+      localStreamType: this.getDefaultPlaybackMode() || "1",
       isDropdownOpen: false,
       _autoplayTimer: null,
+      _autoplayDecisionTimer: null,
+      showAutoplayNotification: false,
+      autoplayNotificationMessage: "",
     };
   },
   computed: {
@@ -254,19 +265,51 @@ export default {
     },
     relatedVideos() {
       const feed = this.video?.related || [];
-      return feed.map((item) => ({
-        base64imge: item.thumbnail || "",
-        badge: item.badge || "",
-        title: item.title || "",
-        metadataRow1: item.channel,
-        metadataRow2Part1: item.views || "",
-        metadataRow2Part2: item.uploaded || "",
-        videoId: item.videoId || "",
-        replaylistId: item.playlistId || "",
-      }));
+      const mapped = feed.map((item) => {
+        // Try to extract duration from badge (e.g., "1:23:45" or "4:30")
+        let duration = item.duration || 0;
+        if (!duration && item.badge) {
+          duration = this.parseDurationFromBadge(item.badge);
+        }
+        return {
+          base64imge: item.thumbnail || "",
+          badge: item.badge || "",
+          title: item.title || "",
+          metadataRow1: item.channel,
+          metadataRow2Part1: item.views || "",
+          metadataRow2Part2: item.uploaded || "",
+          videoId: item.videoId || "",
+          replaylistId: item.playlistId || "",
+          duration: duration,
+        };
+      });
+      
+      // Debug: log the first item to see what data we have
+      if (mapped.length > 0) {
+        console.log("First related video item:", mapped[0]);
+        console.log("Raw API response first item:", feed[0]);
+      }
+      
+      return mapped;
     },
   },
   methods: {
+    getDefaultPlaybackMode() {
+      try {
+        // localStorage を優先的に読む（沙箱環境での Cookie 制限に対応）
+        const fromStorage = localStorage.getItem("defaultPlaybackMode");
+        if (fromStorage) {
+          return fromStorage;
+        }
+        // localStorage にない場合は Cookie から取得
+        const match = document.cookie.match(
+          new RegExp("(^| )StreamType=([^;]+)")
+        );
+        return match ? decodeURIComponent(match[2]) : null;
+      } catch {
+        return null;
+      }
+    },
     getCookieSafe(name) {
       try {
         const match = document.cookie.match(
@@ -277,6 +320,43 @@ export default {
         return null;
       }
     },
+    parseDurationFromBadge(badgeText) {
+      // Try to parse duration from badge text like "1:23:45" or "4:30" or "4分"
+      if (!badgeText || typeof badgeText !== 'string') return 0;
+      
+      badgeText = badgeText.trim();
+      console.log(`Parsing badge: "${badgeText}"`);
+      
+      // Pattern 1: HH:MM:SS format
+      const hhmmssMatch = badgeText.match(/^(\d+):(\d+):(\d+)$/);
+      if (hhmmssMatch) {
+        const seconds = parseInt(hhmmssMatch[1]) * 3600 + parseInt(hhmmssMatch[2]) * 60 + parseInt(hhmmssMatch[3]);
+        console.log(`  HH:MM:SS matched: ${seconds}s`);
+        return seconds;
+      }
+      
+      // Pattern 2: MM:SS format
+      const mmssMatch = badgeText.match(/^(\d+):(\d+)$/);
+      if (mmssMatch) {
+        const seconds = parseInt(mmssMatch[1]) * 60 + parseInt(mmssMatch[2]);
+        console.log(`  MM:SS matched: ${seconds}s`);
+        return seconds;
+      }
+      
+      // Pattern 3: Japanese format like "4分" or "4分30秒"
+      const japaneseMatch = badgeText.match(/^(\d+)分(?:(\d+)秒)?$/);
+      if (japaneseMatch) {
+        let seconds = parseInt(japaneseMatch[1]) * 60;
+        if (japaneseMatch[2]) {
+          seconds += parseInt(japaneseMatch[2]);
+        }
+        console.log(`  Japanese format matched: ${seconds}s`);
+        return seconds;
+      }
+      
+      console.log(`  No pattern matched`);
+      return 0;
+    },
     setCookieSafe(name, value, seconds) {
       try {
         const expires = new Date(Date.now() + seconds * 1000).toUTCString();
@@ -286,39 +366,99 @@ export default {
       } catch {}
     },
     onStreamTypeChange() {
+      // localStorage と Cookie の両方に保存
+      try {
+        localStorage.setItem("defaultPlaybackMode", this.localStreamType);
+      } catch (e) {
+        console.error("localStorage save error:", e);
+      }
       this.setCookieSafe("StreamType", this.localStreamType, 99999);
     },
     onPlayerEnded() {
       try {
-        if (this._autoplayTimer) {
-          clearTimeout(this._autoplayTimer);
-          this._autoplayTimer = null;
-        }
-        this._autoplayTimer = setTimeout(() => {
-          const next =
-            this.relatedVideos && this.relatedVideos.length
-              ? this.relatedVideos[0]
-              : null;
-          if (next && next.videoId) {
-            const query = { v: next.videoId, autoplay: "1" };
-            if (next.replaylistId && next.replaylistId.length > 20)
-              query.list = next.replaylistId;
-            this.$router.push({ path: "/watch", query });
+        // 既存のタイマーをクリア
+        try { if (this._autoplayTimer) { clearTimeout(this._autoplayTimer); this._autoplayTimer = null; } } catch (e) {}
+        try { if (this._autoplayDecisionTimer) { clearTimeout(this._autoplayDecisionTimer); this._autoplayDecisionTimer = null; } } catch (e) {}
+
+        // 少し待って（他のイベントが到着するのを待つ）から遷移タイマーをセット
+        this._autoplayDecisionTimer = setTimeout(() => {
+          try {
+            // 自動再生ロックがある場合はスケジュールを抑止
+            const lockRaw = (() => { try { return sessionStorage.getItem('yt_autoplay_lock'); } catch (e) { return null; } })();
+            if (lockRaw) {
+              try {
+                const lock = JSON.parse(lockRaw);
+                if (lock && lock.expires && Date.now() < lock.expires) {
+                  // ロック期間内はスケジュールを行わない
+                  return;
+                }
+              } catch (e) {}
+            }
+
+            // フィルターが有効な場合はフォールバック処理をしない
+            // （StreamType2 の自動再生イベントに任せる。条件に合う動画がなければ onAutoplayNoSuitableVideo が呼ばれる）
+            const filterConfig = window.__autoplayDurationFilter || { enabled: false };
+            if (filterConfig.enabled) {
+              // フィルターが有効な場合、StreamType2 の候補選択イベントを待つ
+              // 候補がない場合は onAutoplayNoSuitableVideo が呼ばれる
+              return;
+            }
+
+            // フィルターが無効な場合のみフォールバック処理（最初の関連動画を再生）
+            // 決定後、元の3秒遅延で遷移をセット
+            this._autoplayTimer = setTimeout(() => {
+              const next =
+                this.relatedVideos && this.relatedVideos.length
+                  ? this.relatedVideos[0]
+                  : null;
+              if (next && next.videoId) {
+                const query = { v: next.videoId, autoplay: "1" };
+                if (next.replaylistId && next.replaylistId.length > 20)
+                  query.list = next.replaylistId;
+                this.$router.push({ path: "/watch", query });
+              }
+            }, 3000);
+          } catch (e) {
+            console.error('autoplay decision error', e);
           }
-        }, 3000);
+        }, 300); // 300ms の短い待ち時間
       } catch (e) {
         console.error("onPlayerEnded error", e);
       }
     },
 
-    onPlayAutoplayCandidate({ id, prefetched }) {
+    onPlayAutoplayCandidate({ id }) {
       try {
-        // 自動再生候補が来たら、すぐにそのvideoIdへ移行する
         if (!id) return;
+        // 自動遷移中の競合を防ぐためロックを設定（短時間）
+        try {
+          const lock = { target: id, expires: Date.now() + 5000 };
+          sessionStorage.setItem('yt_autoplay_lock', JSON.stringify(lock));
+        } catch (e) {}
+
+        // 決定タイマーや既存の自動遷移タイマーをクリアしてから遷移
+        try { if (this._autoplayDecisionTimer) { clearTimeout(this._autoplayDecisionTimer); this._autoplayDecisionTimer = null; } } catch (e) {}
+        try { if (this._autoplayTimer) { clearTimeout(this._autoplayTimer); this._autoplayTimer = null; } } catch (e) {}
+
         const query = { v: id };
         this.$router.push({ path: "/watch", query });
       } catch (e) {
         console.error("onPlayAutoplayCandidate error", e);
+      }
+    },
+
+    onAutoplayNoSuitableVideo() {
+      try {
+        const filterConfig = window.__autoplayDurationFilter || { enabled: false, minutes: 4 };
+        this.autoplayNotificationMessage = `指定条件（${filterConfig.minutes}分以下）に合う関連動画がないため、自動再生をストップしました。`;
+        this.showAutoplayNotification = true;
+
+        // 5秒後に自動で通知を非表示
+        setTimeout(() => {
+          this.showAutoplayNotification = false;
+        }, 5000);
+      } catch (e) {
+        console.error("onAutoplayNoSuitableVideo error:", e);
       }
     },
 
@@ -724,6 +864,55 @@ p {
 }
 .reload-btn:hover {
   background: #666;
+}
+
+/* 自動再生フィルタ通知 */
+.autoplay-notification {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: #333;
+  color: #fff;
+  padding: 16px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  z-index: 1000;
+  animation: slideIn 0.3s ease-out;
+  max-width: 400px;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.notification-text {
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.notification-close {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.notification-close:hover {
+  color: #ccc;
 }
 
 @media (max-width: 999px) {

@@ -154,26 +154,23 @@ let _loopBufferListenersAttached = false;
 const BUFFER_RESUME_SECONDS = 4;
 let _onEndedAttached = false;
 
-// ended イベントハンドラ（オブジェクトのメソッドとして保持）
+// ended イベントハンドラ（プリフェッチ廃止: 候補IDだけ選んで emit）
 const endedHandler = {
   fn: async () => {
     try { emit('ended'); } catch (e) {}
     try { pushToHistory(props.videoId); } catch (e) {}
     if (!autoplayEnabled.value) return;
     try {
-      const candId = await ensurePrefetchedCandidate();
+      const candId = getAutoplayCandidateId();
       if (!candId) return;
-      emit('play-autoplay-candidate', { id: candId, prefetched: prefetchCache[candId] || null });
+      emit('play-autoplay-candidate', { id: candId });
     } catch (e) {}
   }
 };
 
-let _onEnded = async () => {
-  await endedHandler.fn();
-};
+let _onEnded = async () => { await endedHandler.fn(); };
 const PLAY_HISTORY_KEY = 'yt_play_history_v1';
-// プリフェッチキャッシュ
-const prefetchCache = {};
+// プリフェッチ機能は廃止（候補IDのみ選ぶ）
 
 function loadPlayHistory() {
   try {
@@ -205,7 +202,33 @@ function getAutoplayCandidateId() {
     // avoid current video
     recent.add(props.videoId);
 
-    // list
+    // Get filter settings
+    const filterConfig = window.__autoplayDurationFilter || { enabled: false, maxSeconds: 240 };
+    const maxSeconds = filterConfig.enabled ? filterConfig.maxSeconds : Infinity;
+
+    console.log(`[getAutoplayCandidateId] filterConfig:`, filterConfig, `maxSeconds: ${maxSeconds}`);
+
+    // Helper function to check if a video passes duration filter
+    function passesFilter(durationStr) {
+      if (!filterConfig.enabled) {
+        console.log(`    passesFilter: filter disabled → true`);
+        return true; // No filter
+      }
+      if (!durationStr) {
+        console.log(`    passesFilter: no duration info → true`);
+        return true; // No duration info, allow it
+      }
+      const duration = parseInt(durationStr, 10);
+      if (isNaN(duration)) {
+        console.log(`    passesFilter: invalid duration "${durationStr}" → true`);
+        return true; // Invalid duration, allow it
+      }
+      const passes = duration <= maxSeconds;
+      console.log(`    passesFilter: ${duration}s <= ${maxSeconds}s? → ${passes}`);
+      return passes;
+    }
+
+    // list from window variable
     if (Array.isArray(window.__autoplayCandidates)) {
       for (const id of window.__autoplayCandidates) {
         if (!recent.has(id) && id) return id;
@@ -214,37 +237,45 @@ function getAutoplayCandidateId() {
 
     // DOM: elements with data-video-id
     const els = document.querySelectorAll('[data-video-id]');
+    let foundAnyVideo = false;
     for (const el of els) {
       const id = el.getAttribute('data-video-id');
-      if (id && !recent.has(id)) return id;
+      const durationStr = el.getAttribute('data-duration');
+      
+      if (!id) continue;
+      if (recent.has(id)) {
+        console.log(`Checking video ${id}: SKIPPED (in recent history)`);
+        continue;
+      }
+      
+      foundAnyVideo = true;
+      
+      // Debug logging
+      console.log(`Checking video ${id}: duration="${durationStr}"`);
+      
+      // Check duration filter - MUST pass filter to be selected
+      if (!passesFilter(durationStr)) {
+        console.log(`  → SKIPPED: duration exceeds limit`);
+        continue; // Skip this video, duration exceeds limit or invalid
+      }
+      
+      console.log(`  → SELECTED`);
+      return id; // Found a suitable candidate
     }
-  } catch (e) {}
+    
+    // No suitable candidate found - signal to parent
+    if (foundAnyVideo && filterConfig.enabled) {
+      // Videos exist but don't match filter criteria
+      console.log(`[getAutoplayCandidateId] No suitable candidate found. Emitting autoplay-no-suitable-video`);
+      emit('autoplay-no-suitable-video');
+    }
+  } catch (e) {
+    console.error("getAutoplayCandidateId error:", e);
+  }
   return null;
 }
 
-async function prefetchCandidate(id) {
-  if (!id) return null;
-  if (prefetchCache[id]) return prefetchCache[id];
-  try {
-    const data = await apiRequest({ params: { stream2: id }, retries: 1, timeout: 30000, jsonpFallback: false });
-    prefetchCache[id] = data;
-    return data;
-  } catch (e) {
-    return null;
-  }
-}
-
-// 保証付きで候補をプリフェッチして id を返す
-async function ensurePrefetchedCandidate() {
-  try {
-    const id = getAutoplayCandidateId();
-    if (!id) return null;
-    if (!prefetchCache[id]) {
-      await prefetchCandidate(id);
-    }
-    return id;
-  } catch (e) { return null; }
-}
+// プリフェッチ関連は廃止。候補IDのみを返すユーティリティを使う。
 
 const nativeHlsSupported = ref(false);
 const hasM3u8 = ref(false);
@@ -870,10 +901,11 @@ async function fetchStreamUrl(id) {
       }
     });
 
-    // 自動再生が有効なら事前に候補をプリフェッチ（親が候補リストを提供している場合などに有効）
+    // 自動再生が有効なら候補IDだけ確認する（プリフェッチは行わない）
     try {
       if (autoplayEnabled.value) {
-        ensurePrefetchedCandidate();
+        // noop: 候補は ended 時にその場で選ぶ
+        getAutoplayCandidateId();
       }
     } catch (e) {}
 

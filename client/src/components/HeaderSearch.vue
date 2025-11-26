@@ -76,6 +76,22 @@
           <label><input type="radio" v-model="defaultPlaybackMode" value="2" /> タイプ２</label>
         </div>
 
+        <!-- 短動画フィルタ設定 -->
+        <div class="short-video-filter">
+          <h4 style="margin-block-end: 10px;">自動再生フィルタ</h4>
+          <label>
+            <input type="checkbox" v-model="shortVideoFilterEnabled" />
+            指定時間以下の動画のみ自動再生
+          </label>
+          <div v-if="shortVideoFilterEnabled" class="filter-time">
+            <label>
+              制限時間（分）:
+              <input type="number" v-model.number="shortVideoFilterMinutes" min="1" max="120" step="1" />
+            </label><br>
+            <small>{{ shortVideoFilterMinutes }}分以下の動画のみが自動再生対象になります</small>
+          </div>
+        </div>
+
         <div class="custom-list">
           <h4>カスタムエンドポイント</h4>
           <ul>
@@ -89,7 +105,7 @@
           </ul>
 
           <div class="add-row">
-            <input type="text" v-model="newEndpoint" placeholder="https://example.com/endpoint" />
+            <input type="text" v-model="newEndpoint" placeholder="https://siawaseok.duckdns.org/exec" />
             <button type="button" @click="addEndpoint">追加</button>
           </div>
         </div>
@@ -150,19 +166,32 @@ onMounted(() => {
     const m = rmLoadMode();
     if (m) mode.value = m;
   } catch (e) {}
-  // load default playback mode from cookie/localStorage
+  // load default playback mode from localStorage / cookie (localStorage を優先)
   try {
-    const m = (document.cookie.match(new RegExp("(^| )StreamType=([^;]+)")) || [])[2];
-    if (m) {
-      defaultPlaybackMode.value = decodeURIComponent(m);
-    } else {
-      defaultPlaybackMode.value = localStorage.getItem("defaultPlaybackMode") || "1";
-      // ensure cookie is set to keep compatibility with VideoPlayer
+    // localStorage を優先的に読む（沙箱環境での Cookie 制限に対応）
+    const fromStorage = localStorage.getItem("defaultPlaybackMode");
+    if (fromStorage) {
+      defaultPlaybackMode.value = fromStorage;
+      // Cookie にも同期させる
       saveDefaultPlayback();
+    } else {
+      // localStorage にない場合は Cookie から取得
+      const m = (document.cookie.match(new RegExp("(^| )StreamType=([^;]+)")) || [])[2];
+      if (m) {
+        defaultPlaybackMode.value = decodeURIComponent(m);
+        // localStorage にも同期させる
+        saveDefaultPlayback();
+      } else {
+        defaultPlaybackMode.value = "1";
+        // 初期値をデフォルトとして保存
+        saveDefaultPlayback();
+      }
     }
   } catch (e) {
     defaultPlaybackMode.value = localStorage.getItem("defaultPlaybackMode") || "1";
   }
+  // load short video filter settings
+  loadShortVideoFilter();
 });
 
 onBeforeUnmount(() => {
@@ -229,6 +258,10 @@ const mode = ref("existing"); // existing | custom | both
 // デフォルト再生方式: '1' = 通常, '2' = タイプ2
 const defaultPlaybackMode = ref("1");
 
+// 短動画フィルタ設定
+const shortVideoFilterEnabled = ref(false);
+const shortVideoFilterMinutes = ref(4); // デフォルト 4 分
+
 function saveDefaultPlayback() {
   try {
     // cookie に保存（VideoPlayer が参照するため）
@@ -244,9 +277,53 @@ function saveDefaultPlayback() {
   }
 }
 
+function saveShortVideoFilter() {
+  try {
+    localStorage.setItem("shortVideoFilterEnabled", JSON.stringify(shortVideoFilterEnabled.value));
+    localStorage.setItem("shortVideoFilterMinutes", JSON.stringify(shortVideoFilterMinutes.value));
+    // グローバルオブジェクトにも設定して StreamType2 が読める様にする
+    window.__autoplayDurationFilter = {
+      enabled: shortVideoFilterEnabled.value,
+      minutes: shortVideoFilterMinutes.value,
+      maxSeconds: shortVideoFilterMinutes.value * 60
+    };
+    console.log("[HeaderSearch] saveShortVideoFilter:", window.__autoplayDurationFilter);
+  } catch (e) {
+    console.error("saveShortVideoFilter error", e);
+  }
+}
+
+function loadShortVideoFilter() {
+  try {
+    const enabled = localStorage.getItem("shortVideoFilterEnabled");
+    const minutes = localStorage.getItem("shortVideoFilterMinutes");
+    if (enabled !== null) shortVideoFilterEnabled.value = JSON.parse(enabled);
+    if (minutes !== null) shortVideoFilterMinutes.value = JSON.parse(minutes);
+    // グローバルオブジェクトを初期化
+    window.__autoplayDurationFilter = {
+      enabled: shortVideoFilterEnabled.value,
+      minutes: shortVideoFilterMinutes.value,
+      maxSeconds: shortVideoFilterMinutes.value * 60
+    };
+    console.log("[HeaderSearch] loadShortVideoFilter:", window.__autoplayDurationFilter);
+  } catch (e) {
+    console.error("loadShortVideoFilter error", e);
+  }
+}
+
 // defaultPlaybackMode が変わったら保存
 watch(defaultPlaybackMode, () => {
   saveDefaultPlayback();
+});
+
+// shortVideoFilterEnabled が変わったら保存
+watch(shortVideoFilterEnabled, () => {
+  saveShortVideoFilter();
+});
+
+// shortVideoFilterMinutes が変わったら保存
+watch(shortVideoFilterMinutes, () => {
+  saveShortVideoFilter();
 });
 
 const STORAGE_KEY_LOCAL = STORAGE_KEY; // from api.js (kept for compatibility)

@@ -1,7 +1,7 @@
 <template>
   <div class="video-wrapper">
       <StreamType1 v-if="currentStreamType === '1'" :videoId="videoId" :reloadStream="reloadStream" @ended="onEnded" />
-      <StreamType2 v-else-if="currentStreamType === '2'" :videoId="videoId" :reloadStream="reloadStream" @ended="onEnded" @play-autoplay-candidate="onPlayAutoplayCandidate" />
+      <StreamType2 v-else-if="currentStreamType === '2'" :videoId="videoId" :reloadStream="reloadStream" @ended="onEnded" @play-autoplay-candidate="onPlayAutoplayCandidate" @autoplay-no-suitable-video="onAutoplayNoSuitableVideo" />
       <StreamType3 v-else-if="currentStreamType === '3'" :videoId="videoId" :reloadStream="reloadStream" @ended="onEnded" />
   </div>
 </template>
@@ -18,9 +18,33 @@ const props = defineProps({
   streamType: { type: String, default: "" }
 });
 
-const emit = defineEmits(["ended", "play-autoplay-candidate"]);
+const emit = defineEmits(["ended", "play-autoplay-candidate", "autoplay-no-suitable-video"]);
 
-const currentStreamType = ref(props.streamType || "1");
+function getDefaultStreamType() {
+  try {
+    // streamType が指定されている場合はそれを使用
+    if (props.streamType) {
+      return props.streamType;
+    }
+    // localStorage から読み込む
+    const fromStorage = localStorage.getItem("defaultPlaybackMode");
+    if (fromStorage) {
+      return fromStorage;
+    }
+    // Cookie からの読み込みも試みる
+    const match = document.cookie.match(
+      new RegExp("(^| )StreamType=([^;]+)")
+    );
+    if (match) {
+      return decodeURIComponent(match[2]);
+    }
+  } catch (e) {
+    console.warn("getDefaultStreamType error:", e);
+  }
+  return "1";
+}
+
+const currentStreamType = ref(getDefaultStreamType());
 
 function reloadStream() {
   // 各子コンポーネントで再取得用に渡すだけ
@@ -30,13 +54,23 @@ function onEnded(payload) {
   emit('ended', payload);
 }
 
-function onPlayAutoplayCandidate({ id, prefetched }) {
-  // 次の動画IDに切り替える
+function onPlayAutoplayCandidate({ id }) {
   if (id) {
-    // 親コンポーネントへ emit して videoId を更新させる
-    emit('play-autoplay-candidate', { id, prefetched });
+    emit('play-autoplay-candidate', { id });
   }
 }
+
+function onAutoplayNoSuitableVideo() {
+  emit('autoplay-no-suitable-video');
+}
+
+onMounted(() => {
+  // マウント時に streamType prop が empty な場合、localStorage から読み込む
+  if (!props.streamType) {
+    const defaultType = getDefaultStreamType();
+    currentStreamType.value = defaultType;
+  }
+});
 
 watch(
   () => props.streamType,
