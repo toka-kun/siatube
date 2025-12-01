@@ -50,7 +50,7 @@
               <h4>画像3</h4><br><img :src="img3" style="max-width: 90%;"><br><h4>画像4</h4><br><img :src="img4" style="max-width: 90%;"><br><h4>画像5</h4><br><img :src="img5" style="max-width: 90%;"><br><h4>画像6</h4><br><img :src="img6" style="max-width: 90%;">
             </li>
           </ol>
-          <p>コピーしたリンクをカスタムエンドポイントに追加すれば完了です。</p>
+          <p style="color: var(--text-primary);">コピーしたリンクをカスタムエンドポイントに追加すれば完了です。</p>
         </div>
       </div>
     </div>

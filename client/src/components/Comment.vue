@@ -1,9 +1,9 @@
 <template>
   <section class="comments-section">
-    <h2 v-if="totalCommentCount !== null">{{ totalCommentCount }}</h2>
+    <h2 v-if="totalCommentCount !== null" style="color: var(--text-primary);">{{ totalCommentCount }}</h2>
 
     <!-- ローディング表示 -->
-    <p v-if="loading">コメントを読み込み中...</p>
+    <p v-if="loading" style="color: var(--text-primary);">コメントを読み込み中...</p>
 
     <!-- コメントリスト -->
     <ul v-else-if="comments.length > 0" class="comment-list">
@@ -49,8 +49,8 @@
       </li>
     </ul>
 
-    <p v-else-if="!error">コメントが見つかりません。</p>
-    <p v-if="error" class="error-msg">⚠️ {{ error }}<br />
+    <p v-else-if="!error" style="color: var(--text-primary);">コメントが見つかりません。</p>
+    <p v-if="error" class="error-msg" style="color: var(--accent-weak);">⚠️ {{ error }}<br />
       <button @click="fetchComments" class="retry-btn" type="button">再取得</button>
     </p>
   </section>

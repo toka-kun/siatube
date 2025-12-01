@@ -1,12 +1,12 @@
 <template>
-  <section v-if="error" class="error-message">
+  <section v-if="error" class="error-message" style="color: var(--text-primary);">
     プレイリストの取得に失敗しました。
   </section>
 
   <section v-else-if="playlist" class="playlist-section" :class="`type-${displayType}`">
     <template v-if="displayType !== 'channel'">
-      <h2 class="playlist-title">{{ playlist.title }}</h2>
-      <p class="playlist-meta">
+      <h2 class="playlist-title" style="color: var(--text-primary);">{{ playlist.title }}</h2>
+      <p class="playlist-meta" style="color: var(--text-primary);">
         動画本数: {{ playlist.totalItems }}
         <span class="views" v-if="displayType !== 'watch'">｜再生数: {{ playlist.views }}回</span>
       </p>
@@ -61,7 +61,7 @@
   </section>
 
   <section v-else>
-    <p>プレイリストを読み込み中...</p>
+    <p style="color: var(--text-primary);">プレイリストを読み込み中...</p>
   </section>
 </template>
 

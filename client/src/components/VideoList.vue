@@ -1,6 +1,6 @@
 <template>
   <section>
-    <h2 style="margin-inline-start: 7px;">{{ title }}</h2>
+    <h2 style="margin-inline-start: 7px; color: var(--text-primary);">{{ title }}</h2>
     <ul class="video-list">
       <li v-for="video in videos" :key="video.id" class="video-item">
         <!-- 動画 -->

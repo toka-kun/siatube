@@ -174,7 +174,7 @@
   <div v-if="tab === 'home'" class="page-end">
     <div>
       <br>
-      <p v-if="!loadingChannel">すべての動画を見るには「動画」セクションに移動してください</p>
+      <p v-if="!loadingChannel" style="color: var(--text-primary);">すべての動画を見るには「動画」セクションに移動してください</p>
       <div v-else class="skeleton skeleton-text" style="width: 60%; height: 1em; margin: 0 auto;"></div>
     </div>
     <div class="tabs">
