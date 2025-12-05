@@ -1,6 +1,6 @@
 <template>
   <div class="playlists-container">
-    <h1>プレイリスト</h1>
+    <h1>再生リスト</h1>
     <!-- 内容は後で実装 -->
   </div>
 </template>

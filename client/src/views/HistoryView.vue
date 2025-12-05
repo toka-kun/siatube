@@ -16,7 +16,7 @@
     </div>
 
     <div v-else-if="videos.length === 0" class="empty-msg">
-      視聴履歴がありません
+      視聴履歴がありません<br>プライベートモードの場合、正しく動作しない場合があります。
     </div>
 
     <div v-else class="video-list">
@@ -40,7 +40,7 @@
           <div class="meta-info">
             <span class="channel-name">{{ video.authorName }}</span>
             <span class="meta-separator">・</span>
-            <span class="view-count">{{ formatViews(video.views) }}回</span>
+            <span class="view-count">{{ video.views }}</span>
           </div>
           <p class="video-description">{{ video.description }}</p>
         </div>
@@ -122,19 +122,6 @@ const watchVideo = (videoId) => {
     path: '/watch',
     query: { v: videoId }
   });
-};
-
-const formatViews = (views) => {
-  if (!views) return '0';
-  const num = parseInt(views, 10);
-  if (isNaN(num)) return views;
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(1) + '百万';
-  }
-  if (num >= 10000) {
-    return (num / 10000).toFixed(1) + '万';
-  }
-  return num.toLocaleString();
 };
 
 const onImageError = (event) => {
@@ -241,10 +228,15 @@ h1 {
   background-color: var(--hover-bg, #404040);
 }
 
+.video-title:hover {
+  color: var(--link-hover);
+  text-decoration: underline;
+}
+
 .thumbnail-wrapper {
   position: relative;
-  width: 320px;
-  height: 180px;
+  width: 250px;
+  height: 141px;
   flex-shrink: 0;
   overflow: hidden;
   border-radius: 6px;
@@ -340,7 +332,7 @@ h1 {
   }
 }
 
-@media (max-width: 789px) {
+@media (max-width: 640px) {
   .history-container {
     margin-left: 0;
     padding: 16px;
@@ -362,6 +354,7 @@ h1 {
 
   .thumbnail-wrapper {
     width: 100%;
+    max-width: 360px;
     height: auto;
     aspect-ratio: 16 / 9;
   }
@@ -371,7 +364,7 @@ h1 {
   }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 420px) {
   h1 {
     font-size: 1.3rem;
   }
@@ -389,4 +382,5 @@ h1 {
     height: auto;
   }
 }
+
 </style>

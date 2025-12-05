@@ -410,7 +410,7 @@ const clearLocalStorage = () => {
   top: 52px;
   left: var(--sidebar-offset, 250px); /* CSS variable を使ってサイドバー幅に追従 */
   bottom: 0;
-  width: 367px;
+  width: 380px;
   max-width: none;
   background-color: var(--bg-primary);
   border-right: 1px solid var(--border-color);
@@ -646,19 +646,15 @@ const clearLocalStorage = () => {
   }
 }
 
-/* ビューポート幅が中〜大のときも、幅は 367px 固定 */
 @media (max-width: 1314px) and (min-width: 790px) {
   .settings-modal {
     left: var(--sidebar-offset, 250px);
-    width: 367px;
   }
 }
 
-/* Sidebar の動的状態に対応するため、Sidebar.vue が body に付与するクラスを参照する
-   幅は常に 367px 固定で、left のみ動的に変わる */
 :deep(body.sidebar-compact) .settings-modal {
   left: 70px !important;
-  width: 367px !important;
+  width: 380px !important;
 }
 
 :deep(body.sidebar-hidden) .settings-modal {

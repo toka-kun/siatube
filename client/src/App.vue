@@ -5,7 +5,7 @@
       @toggle-sidebar="handleToggleSidebar"
       :sidebar-open="sidebarOpen"
     />
-    <Sidebar :open="sidebarOpen" />
+    <Sidebar :open="sidebarOpen" :is-watch-page="route.path === '/watch'" />
     <main class="app-content" :class="{ 'sidebar-closed': !sidebarOpen }">
       <router-view />
     </main>
@@ -18,6 +18,7 @@ import Sidebar from '@/components/Sidebar.vue';
 import SettingsView from '@/views/SettingsView.vue';
 import { ref, computed, provide, watch, onBeforeUnmount } from 'vue';
 import { loadDisplayMode, computeIsDarkFromMode } from '@/utils/settingsManager';
+import { useRoute } from 'vue-router';
 
 export default {
   name: 'App',
@@ -28,6 +29,7 @@ export default {
   },
   setup() {
     console.log('[App.vue] setup() called');
+    const route = useRoute();
     const viewportWidth = ref(window.innerWidth);
     // Initialize sidebarOpen based on screen width (consistent default)
     const sidebarOpen = ref(window.innerWidth >= 1315);
@@ -90,6 +92,15 @@ export default {
     };
     window.addEventListener('resize', updateSidebarByWidth);
 
+    // Monitor route changes and hide sidebar for /watch page
+    watch(() => route.path, (newPath) => {
+      if (newPath === '/watch') {
+        sidebarOpen.value = false;
+      } else {
+        updateSidebarByWidth();
+      }
+    });
+
     // Provide settings modal functions
     console.log('[App.vue] Providing settingsModal with isOpen:', settingsModalOpen);
     provide('settingsModal', {
@@ -99,6 +110,7 @@ export default {
     });
 
     return {
+      route,
       sidebarOpen,
       toggleSidebar,
       handleToggleSidebar,
