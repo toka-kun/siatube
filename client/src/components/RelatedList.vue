@@ -8,7 +8,7 @@
     />
     <h3 class="related-title">関連動画</h3>
     <ul class="related-list">
-      <li v-for="r in relatedVideos" :key="r.videoId" class="related-item" :data-video-id="r.videoId">
+      <li v-for="(r, index) in relatedVideos" :key="r.videoId" :ref="(el) => { if (index === relatedVideos.length - 1) lastItem = el; }" class="related-item" :data-video-id="r.videoId">
         <router-link v-if="r.videoId" :to="rLink(r)" class="page-link">
           <div class="thumb-wrapper">
             <img :src="r.base64imge" :alt="r.title" class="thumb-img" />
@@ -28,6 +28,7 @@
         </router-link>
       </li>
     </ul>
+    <p v-if="loadingMore" class="loading-more">関連動画をさらに取得中...</p>
   </aside>
 </template>
 
@@ -41,15 +42,50 @@ export default {
     relatedVideos: { type: Array, default: () => [] },
     playlistId: { type: [String, null], default: null },
     currentVideoId: { type: String, default: '' },
+    loadingMore: { type: Boolean, default: false },
+  },
+  data() {
+    return {
+      lastItem: null,
+      observer: null,
+    };
+  },
+  mounted() {
+    this.observeLastItem();
+  },
+  beforeUnmount() {
+    if (this.observer) {
+      this.observer.disconnect();
+    }
+  },
+  watch: {
+    relatedVideos() {
+      this.$nextTick(() => {
+        this.observeLastItem();
+      });
+    },
   },
   methods: {
     rLink(r) {
-      if (r.replaylistId && r.replaylistId.length > 20) {
+      if (r.type === "playlist") {
         return `/watch?v=${r.videoId}&list=${r.replaylistId}`;
       } else if (this.playlistId) {
         return `/watch?v=${r.videoId}&list=${this.playlistId}`;
       } else {
         return `/watch?v=${r.videoId}`;
+      }
+    },
+    observeLastItem() {
+      if (this.observer) {
+        this.observer.disconnect();
+      }
+      if (this.lastItem) {
+        this.observer = new IntersectionObserver((entries) => {
+          if (entries[0].isIntersecting) {
+            this.$emit('load-more');
+          }
+        });
+        this.observer.observe(this.lastItem);
       }
     },
   },
@@ -120,6 +156,13 @@ export default {
   font-weight: 500;
   color: var(--text-secondary);
   display: block;
+}
+
+.loading-more {
+  text-align: center;
+  padding: 12px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
 }
 
 .video-info { flex: 1; }

@@ -62,7 +62,7 @@
       <Comment :videoId="videoId" />
     </div>
 
-    <RelatedList v-if="relatedVideos.length" :relatedVideos="relatedVideos" :playlistId="playlistId" :currentVideoId="videoId" />
+    <RelatedList v-if="relatedVideos.length" :relatedVideos="relatedVideos" :playlistId="playlistId" :currentVideoId="videoId" :loadingMore="loadingMore" @load-more="loadMoreRelatedVideos" />
     <div v-else-if="error" class="error-msg">
       ⚠️ {{ error }}<br>
       <button class="reload-btn" @click="reloadVideo">再取得</button>
@@ -135,6 +135,8 @@ export default {
       showAutoplayNotification: false,
       autoplayNotificationMessage: "",
       showPlaylistModal: false,
+      nextContinuationToken: null,
+      loadingMore: false,
     };
   },
   computed: {
@@ -200,6 +202,7 @@ export default {
         if (item.type === "playlist") {
           // Handle playlist items
           return {
+            type: item.type,
             base64imge: item.thumbnail || "",
             badge: "",
             title: item.title || "",
@@ -214,6 +217,7 @@ export default {
         } else {
           // Handle video items
           return {
+            type: item.type,
             base64imge: item.thumbnail || "",
             badge: item.badge || "",
             title: item.title || "",
@@ -439,13 +443,14 @@ export default {
         this.error = null;
         // requestManager の apiRequest を使って中央集約されたリクエストを実行
         const data = await apiRequest({
-          params: { video: id },
+          params: { video: id, depth: 1 },
           method: "GET",
           retries: maxRetries,
           timeout: 15000,
         });
 
         this.video = data;
+        this.nextContinuationToken = data["Related-videos"]?.nextContinuationToken || null;
         
         // 履歴に保存（非同期で実行、エラーは無視）
         try {
@@ -503,6 +508,27 @@ export default {
       this.localStreamType = value;
       this.isDropdownOpen = false;
       this.onStreamTypeChange();
+    },
+    async loadMoreRelatedVideos() {
+      if (!this.nextContinuationToken || this.loadingMore) return;
+      this.loadingMore = true;
+      try {
+        const data = await apiRequest({
+          params: { video: this.videoId, token: this.nextContinuationToken, depth: 2 },
+          method: "GET",
+          retries: 3,
+          timeout: 15000,
+        });
+        if (data["Related-videos"] && Array.isArray(data["Related-videos"].relatedVideos)) {
+          // Append new related videos
+          this.video["Related-videos"].relatedVideos.push(...data["Related-videos"].relatedVideos);
+          this.nextContinuationToken = data["Related-videos"].nextContinuationToken || null;
+        }
+      } catch (err) {
+        console.error("loadMoreRelatedVideos error:", err);
+      } finally {
+        this.loadingMore = false;
+      }
     },
     handleClickOutside(event) {
       if (this.isDropdownOpen && !this.$el.contains(event.target)) {
