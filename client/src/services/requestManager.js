@@ -1,5 +1,6 @@
 // API 呼び出し管理（フォールバック前に10s待機を追加）
 import { apiurl } from "@/api";
+import { loadCustomEndpointsJsonpOnly } from "@/utils/settingsManager";
 
 // localStorage keys
 const STORAGE_KEY = "custom_api_endpoints_v1";
@@ -202,7 +203,8 @@ export async function apiRequest(options = {}) {
   const base = getEffectiveApiUrl();
   const url = buildUrl(base, params);
   const isCustom = loadCustomEndpoints().includes(base);
-
+  let jsonpOnlyForCustom = false;
+  try { jsonpOnlyForCustom = !!loadCustomEndpointsJsonpOnly(); } catch {}
   // ---- カスタム URL: JSONP 優先 ----
   if (isCustom) {
     try {
@@ -210,14 +212,21 @@ export async function apiRequest(options = {}) {
       const status = jsonpData?.status ?? 200;
 
       if (status >= 400 && status <= 599) {
+        if (jsonpOnlyForCustom) {
+          throw new Error(`JSONP returned HTTP ${status}`);
+        }
         console.warn(`JSONP got HTTP ${status}, waiting 10s before fetch fallback...`);
         await waitForPossibleResponse(10000); // ★ 10秒待つ
       } else {
         return jsonpData;
       }
     } catch (err) {
-      console.warn("JSONP failed, fallback to fetch:", err);
+      console.warn("JSONP failed", err);
       lastErr = err;
+      if (jsonpOnlyForCustom) {
+        // JSONPのみを許可する設定 -> フェッチへフォールバックしない
+        throw err;
+      }
     }
   }
 

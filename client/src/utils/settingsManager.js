@@ -8,6 +8,7 @@ const STORAGE_KEYS = {
   SHORT_VIDEO_FILTER_MINUTES: 'shortVideoFilterMinutes',
   DARK_MODE: 'darkMode',
   DISPLAY_MODE: 'displayMode',
+  CUSTOM_ENDPOINTS_JSONP_ONLY: 'customEndpointsJsonpOnly',
 };
 
 const DEFAULTS = {
@@ -176,6 +177,34 @@ export function loadDisplayMode() {
 }
 
 /**
+ * カスタムエンドポイントに対して JSONP のみを使用するかどうかを保存
+ * @param {boolean} enabled
+ */
+export function saveCustomEndpointsJsonpOnly(enabled) {
+  try {
+    safeSetItem(STORAGE_KEYS.CUSTOM_ENDPOINTS_JSONP_ONLY, !!enabled);
+  } catch (e) {
+    console.error('saveCustomEndpointsJsonpOnly error', e);
+  }
+}
+
+/**
+ * カスタムエンドポイントに対して JSONP のみを使用するかどうかを読み込み
+ * @returns {boolean}
+ */
+export function loadCustomEndpointsJsonpOnly() {
+  try {
+    const v = safeGetItem(STORAGE_KEYS.CUSTOM_ENDPOINTS_JSONP_ONLY, null);
+    // デフォルトを true に変更（ユーザーに優しい既定値）
+    if (v === null || v === undefined) return true;
+    return !!v;
+  } catch (e) {
+    console.error('loadCustomEndpointsJsonpOnly error', e);
+    return true;
+  }
+}
+
+/**
  * displayMode から実際にダークモードかどうかを判定する補助関数
  * @param {string} mode
  * @returns {boolean}
@@ -219,4 +248,6 @@ export default {
   loadDisplayMode,
   computeIsDarkFromMode,
   isValidUrl,
+  saveCustomEndpointsJsonpOnly,
+  loadCustomEndpointsJsonpOnly,
 };

@@ -89,6 +89,19 @@
             <button type="button" @click="addEndpoint">追加</button>
           </div>
         </section>
+        
+        <!-- その他 -->
+        <section class="settings-section">
+          <h3>その他</h3>
+          <label>
+            <input
+              type="checkbox"
+              :checked="jsonpOnlyForCustom"
+              @change="handleJsonpOnlyChange($event.target.checked)"
+            />
+            カスタムエンドポイントはJSONPのみを使用（fetchへフォールバックしない）
+          </label>
+        </section>
       </div>
 
       <!-- フッター -->
@@ -118,6 +131,8 @@ import {
   loadDisplayMode,
   saveDisplayMode,
   computeIsDarkFromMode,
+  loadCustomEndpointsJsonpOnly,
+  saveCustomEndpointsJsonpOnly,
   isValidUrl,
 } from "@/utils/settingsManager";
 
@@ -134,6 +149,7 @@ const defaultPlaybackMode = ref("1");
 const shortVideoFilterEnabled = ref(false);
 const shortVideoFilterMinutes = ref(4);
 const displayMode = ref('device');
+const jsonpOnlyForCustom = ref(true);
 
 // Backup state (for cancel functionality)
 const backupState = ref({});
@@ -152,7 +168,7 @@ onMounted(() => {
   saveBackup();
   
   // 設定をlocalStorageに保存するwatcher
-  watch([customEndpoints, mode, defaultPlaybackMode, shortVideoFilterEnabled, shortVideoFilterMinutes, displayMode], 
+  watch([customEndpoints, mode, defaultPlaybackMode, shortVideoFilterEnabled, shortVideoFilterMinutes, displayMode, jsonpOnlyForCustom], 
     () => {
       saveToLocalStorage();
     },
@@ -239,6 +255,13 @@ const loadSettings = () => {
   } catch (e) {
     displayMode.value = 'device';
   }
+
+  // JSONPのみ設定の読み込み（カスタムエンドポイント用）
+  try {
+    jsonpOnlyForCustom.value = loadCustomEndpointsJsonpOnly();
+  } catch (e) {
+    jsonpOnlyForCustom.value = true;
+  }
 };
 
 const saveBackup = () => {
@@ -250,6 +273,7 @@ const saveBackup = () => {
     shortVideoFilterEnabled: shortVideoFilterEnabled.value,
     shortVideoFilterMinutes: shortVideoFilterMinutes.value,
     displayMode: displayMode.value,
+    jsonpOnlyForCustom: jsonpOnlyForCustom.value,
   };
 };
 
@@ -310,6 +334,15 @@ const handleDisplayModeChange = (newMode) => {
   applyDisplayMode(newMode);
 };
 
+const handleJsonpOnlyChange = (enabled) => {
+  jsonpOnlyForCustom.value = !!enabled;
+  try {
+    saveCustomEndpointsJsonpOnly(!!enabled);
+  } catch (e) {
+    console.warn('[SettingsView.vue] Failed to persist jsonpOnlyForCustom', e);
+  }
+};
+
 const handleNewEndpointChange = (value) => {
   newEndpoint.value = value;
 };
@@ -353,6 +386,7 @@ const saveToLocalStorage = () => {
       defaultPlaybackMode: defaultPlaybackMode.value,
       shortVideoFilterEnabled: shortVideoFilterEnabled.value,
       shortVideoFilterMinutes: shortVideoFilterMinutes.value,
+      jsonpOnlyForCustom: jsonpOnlyForCustom.value,
       displayMode: displayMode.value,
       timestamp: Date.now()
     };
@@ -369,6 +403,7 @@ const loadFromLocalStorage = () => {
     if (stored) {
       const data = JSON.parse(stored);
       console.log('[SettingsView.vue] Loaded from localStorage:', data);
+      if (typeof data.jsonpOnlyForCustom !== 'undefined') jsonpOnlyForCustom.value = !!data.jsonpOnlyForCustom;
       return data;
     }
   } catch (e) {
