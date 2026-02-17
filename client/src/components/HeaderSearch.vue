@@ -151,7 +151,6 @@ const onClickOutside = (event) => {
 };
 onMounted(() => {
   document.addEventListener("click", onClickOutside);
-  router.push('/');
 
   // ウィンドウリサイズリスナー
   const handleResize = () => {
