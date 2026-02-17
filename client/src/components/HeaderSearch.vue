@@ -152,6 +152,9 @@ const onClickOutside = (event) => {
 onMounted(() => {
   document.addEventListener("click", onClickOutside);
 
+  // html単体で動かさないときは消したほうが良い
+  router.push('/');
+
   // ウィンドウリサイズリスナー
   const handleResize = () => {
     viewportWidth.value = window.innerWidth;

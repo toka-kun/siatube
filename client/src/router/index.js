@@ -63,6 +63,11 @@ const routes = [
     name: "Settings",
     component: SettingsView,
   },
+  {
+    path: "/:pathMatch(.*)*",
+    name: "NotFound",
+    redirect: "/",
+  },
 ];
 
 const router = createRouter({

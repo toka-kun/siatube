@@ -18,6 +18,8 @@
         <div class="channel-text">
           <div class="channel-name" @click.stop="onChannelClick" @keydown.enter="onChannelClick" tabindex="0" role="button">
             {{ authorName }}
+            <span style="margin-left: 5px;" v-if="authorBadge === 'AUDIO_BADGE'"><svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg" display="inherit"> <g class="layer"> <title>Layer 1</title>  <path d="m6.6,1.04l-0.62,0.62l-0.87,0a3.41,3.43 0 0 0 -3.41,3.43l0,0.87l-0.62,0.62a3.41,3.43 0 0 0 0,4.85l0.62,0.62l0,0.87a3.41,3.43 0 0 0 3.41,3.43l0.87,0l0.62,0.62a3.41,3.43 0 0 0 4.82,0l0.62,-0.62l0.87,0a3.41,3.43 0 0 0 3.41,-3.43l0,-0.87l0.62,-0.62a3.41,3.43 0 0 0 0,-4.85l-0.62,-0.62l0,-0.87a3.41,3.43 0 0 0 -3.41,-3.43l-0.87,0l-0.62,-0.62a3.41,3.43 0 0 0 -4.82,0zm6.28,5.42a0.41,0.41 0 0 1 0.19,0.35l0,1.42a0.21,0.21 0 0 1 -0.32,0.18l-2.12,-1.28l0,3.72a2.23,2.25 0 1 1 -1.62,-2.16l0,-3.85a0.41,0.41 0 0 1 0.62,-0.35l3.25,1.98z" id="svg_1"/> </g></svg>  </span> 
+            <span style="margin-left: 5px;" v-else-if="authorBadge === 'CHECK_CIRCLE_THICK'"><svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg" display="inherit"> <g class="layer">  <title>Layer 1</title>  <path d="m9.04,0.16c-4.94,0 -8.93,3.98 -8.93,8.91s4,8.91 8.93,8.91s8.93,-3.99 8.93,-8.91s-4,-8.91 -8.93,-8.91zm4.64,5.9a0.81,0.81 0 0 1 0,1.15l-6.26,6.23l-3.01,-3a0.81,0.81 0 1 1 1.15,-1.15l1.86,1.86l5.11,-5.1a0.81,0.81 0 0 1 1.15,0z" id="svg_1"/> </g></svg></span>
           </div>
           <p class="subscriber-count">{{ subscriberCount }}</p>
         </div>
@@ -199,6 +201,9 @@ export default {
       }
       return name;
     },
+    authorBadge() {
+      return this.video?.extended_badges?.[0]?.metadataBadgeRenderer?.icon?.iconType || "";
+    },
     authorThumbnailUrl() {
       const author = this.video?.author;
       if (!author) return "情報なし";
@@ -244,7 +249,6 @@ export default {
       const feed = this.video?.["Related-videos"]?.relatedVideos || [];
       const mapped = feed.map((item) => {
         if (item.type === "playlist") {
-          // Handle playlist items
           return {
             type: item.type,
             base64imge: item.thumbnail || "",
@@ -259,7 +263,6 @@ export default {
             verifiedIcon: null,
           };
         } else {
-          // Handle video items
           return {
             type: item.type,
             base64imge: item.thumbnail || "",
@@ -276,7 +279,6 @@ export default {
         }
       });
       
-      // Debug: log the first item to see what data we have
       if (mapped.length > 0) {
         console.log("First related video item:", mapped[0]);
         console.log("Raw API response first item:", feed[0]);
@@ -288,12 +290,10 @@ export default {
   methods: {
     getDefaultPlaybackMode() {
       try {
-        // localStorage を優先的に読む（沙箱環境での Cookie 制限に対応）
         const fromStorage = localStorage.getItem("defaultPlaybackMode");
         if (fromStorage) {
           return fromStorage;
         }
-        // localStorage にない場合は Cookie から取得
         const match = document.cookie.match(
           new RegExp("(^| )StreamType=([^;]+)")
         );
@@ -313,13 +313,11 @@ export default {
       }
     },
     parseDurationFromBadge(badgeText) {
-      // Try to parse duration from badge text like "1:23:45" or "4:30" or "4分"
       if (!badgeText || typeof badgeText !== 'string') return 0;
       
       badgeText = badgeText.trim();
       console.log(`Parsing badge: "${badgeText}"`);
       
-      // Pattern 1: HH:MM:SS format
       const hhmmssMatch = badgeText.match(/^(\d+):(\d+):(\d+)$/);
       if (hhmmssMatch) {
         const seconds = parseInt(hhmmssMatch[1]) * 3600 + parseInt(hhmmssMatch[2]) * 60 + parseInt(hhmmssMatch[3]);
@@ -327,7 +325,6 @@ export default {
         return seconds;
       }
       
-      // Pattern 2: MM:SS format
       const mmssMatch = badgeText.match(/^(\d+):(\d+)$/);
       if (mmssMatch) {
         const seconds = parseInt(mmssMatch[1]) * 60 + parseInt(mmssMatch[2]);
@@ -335,7 +332,6 @@ export default {
         return seconds;
       }
       
-      // Pattern 3: Japanese format like "4分" or "4分30秒"
       const japaneseMatch = badgeText.match(/^(\d+)分(?:(\d+)秒)?$/);
       if (japaneseMatch) {
         let seconds = parseInt(japaneseMatch[1]) * 60;
@@ -356,7 +352,6 @@ export default {
         console.debug('toggleSubscribe clicked', { id, subscribedBefore: subscriptionManager.isSubscribed(id) });
         if (!id || id === '情報なし') return;
         if (subscriptionManager.isSubscribed(id)) {
-          // Unsubscribe immediately
           subscriptionManager.removeSubscription(id);
           this.subscribedLocal = false;
           try { window.dispatchEvent(new CustomEvent('subscriptions-changed')); } catch(e){}
@@ -365,9 +360,7 @@ export default {
           this.showAutoplayNotification = true;
           setTimeout(() => (this.showAutoplayNotification = false), 2000);
         } else {
-          // Optimistically add subscription immediately (show thumbnail URL first if available)
           const initialIcon = (this.authorThumbnailUrl && this.authorThumbnailUrl !== '情報なし') ? this.authorThumbnailUrl : null;
-          // Use the underlying author/channel name for subscriptions (not the collaborator summary like "X、他4チャンネル")
           const authorObj = this.video?.author || {};
           const subName = authorObj.name || (authorObj.collaborator && Array.isArray(authorObj.collaborators) && authorObj.collaborators[0]?.name) || this.authorName;
           subscriptionManager.addSubscription({ id, name: subName, icon: initialIcon });
@@ -872,6 +865,8 @@ p {
 }
 
 .channel-name {
+  display: inline-flex;
+  align-items: center; 
   font-weight: 500;
   font-size: 1.1rem;
   color: var(--text-primary);
