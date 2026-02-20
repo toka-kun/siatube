@@ -1,0 +1,5 @@
+name = "siatube"
+
+[assets]
+directory = "./client/dist"
+binding = "ASSETS"
