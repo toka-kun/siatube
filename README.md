@@ -37,6 +37,7 @@
       その場合は<br>
       <code>https://raw.githubusercontent.com/ajgpw/ajgpw.github.io/refs/heads/main/%E3%81%97%E3%81%82tube/index.html</code>
       を使用してください。</li>
+  <li>ページを開いたときに”/”へ行きますがそれが嫌な場合<a href="https://github.com/ajgpw/youtube/blob/edc7059a7f4bd557fe4c7d393b8ecce22aaabb41/client/src/components/HeaderSearch.vue#L156">https://github.com/ajgpw/youtube/blob/edc7059a7f4bd557fe4c7d393b8ecce22aaabb41/client/src/components/HeaderSearch.vue#L156</a><br>ここを編集してください</li>
   <li>CSS と JS が大量に HTML 内に含まれているため、端末によってはページが重くなる場合があります（ブラウザで実行する分には影響はありません）。</li>
 </ul>
 
