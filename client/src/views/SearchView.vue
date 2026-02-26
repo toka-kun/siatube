@@ -1,18 +1,16 @@
 <template>
   <div>
     <!-- 通常読み込み中 -->
-    <div v-if="loading || retrying" class="loading">{{ retrying ? "再読み込み中…" : "読み込み中…" }}</div>
+    <div v-if="loading || retrying" class="loading">
+      {{ retrying ? "再読み込み中…" : "読み込み中…" }}
+    </div>
 
     <!-- エラー表示 -->
     <div v-if="error" class="error">
       {{ error }}
-      <button 
-        @click="retry" 
-        class="retry-btn" 
-        :disabled="retrying"
-      >
+      <button @click="retry" class="retry-btn" :disabled="retrying">
         {{ retrying ? "再読み込み中…" : "再試行" }}
-      </button><br>右上の設定マークからカスタムエンドポイントのを追加してください　＊方法は簡単で1~3分で作れます
+      </button>
     </div>
 
     <!-- 成功時の動画リスト -->
@@ -69,7 +67,7 @@ export default {
       // 通常の検索呼び出しか再試行かでフラグ設定
       if (!this.retrying) this.loading = true;
       this.error = null;
-      this.videos = [];  // 検索開始時にクリア
+      this.videos = []; // 検索開始時にクリア
 
       try {
         const data = await apiRequest({
@@ -80,13 +78,17 @@ export default {
         });
 
         // レスポンスがエラーオブジェクトの場合
-        if (data && typeof data === 'object' && data.error) {
+        if (data && typeof data === "object" && data.error) {
           this.error = "メインサーバーから無効な応答が帰ってきました";
           this.videos = [];
           return;
         }
 
-        this.videos = Array.isArray(data.results) ? data.results : (Array.isArray(data) ? data : []);
+        this.videos = Array.isArray(data.results)
+          ? data.results
+          : Array.isArray(data)
+          ? data
+          : [];
       } catch (e) {
         console.warn("fetchSearchResults error:", e);
         this.error = "検索APIの取得に失敗しました";
@@ -106,18 +108,18 @@ export default {
 </script>
 
 <style scoped>
-.loading { 
-  padding: 1rem; 
-  text-align: center; 
+.loading {
+  padding: 1rem;
+  text-align: center;
   font-weight: bold;
   color: var(--text-primary);
   background-color: var(--bg-primary);
 }
 
-.error { 
-  color: var(--accent-weak); 
-  padding: 1rem; 
-  text-align: center; 
+.error {
+  color: var(--accent-weak);
+  padding: 1rem;
+  text-align: center;
 }
 
 .retry-btn {
@@ -137,14 +139,14 @@ export default {
   color: var(--text-secondary);
 }
 
-.retry-btn:hover:not(:disabled) { 
+.retry-btn:hover:not(:disabled) {
   background-color: var(--accent-dark);
   color: var(--on-accent);
 }
 
-.no-results { 
-  padding: 1rem; 
-  text-align: center; 
-  color: var(--text-secondary); 
+.no-results {
+  padding: 1rem;
+  text-align: center;
+  color: var(--text-secondary);
 }
 </style>
