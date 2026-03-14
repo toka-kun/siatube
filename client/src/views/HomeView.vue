@@ -32,7 +32,7 @@
         表示回数
         <img src="https://count.getloli.com/@:siatube?name=%3Asiatube&theme=minecraft&padding=7&offset=0&align=top&scale=1&pixelated=1&darkmode=auto" style="width: 50%; max-width: 380px;">
       </div>
-      <div style="color: var(--text-secondary);">バージョン1.5.3</div>
+      <div style="color: var(--text-secondary);">バージョン1.5.4</div>
     </footer>
   </div>
 </template>

@@ -467,7 +467,7 @@
     />
     <div v-else-if="error" class="error-msg">
       ⚠️ {{ error }}<br />
-      <button class="reload-btn" @click="reloadVideo">再取得</button>
+      <button class="reload-btn" @click="reloadVideo">再取得</button><br>カスタムエンドポイントを設定していない場合、設定からカスタムエンドポイントのを追加してください　＊1~3分で作れます
     </div>
     <p v-else class="loading-msg">読み込み中...</p>
 

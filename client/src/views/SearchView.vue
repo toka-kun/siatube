@@ -2,7 +2,7 @@
   <div>
     <!-- 通常読み込み中 -->
     <div v-if="loading || retrying" class="loading">
-      {{ retrying ? "再読み込み中…" : "読み込み中…" }}
+      {{ retrying ? "再読み込み中…" : "読み込み中…" }}<br>カスタムエンドポイントを設定していない場合、設定からカスタムエンドポイントのを追加してください　＊1~3分で作れます
     </div>
 
     <!-- エラー表示 -->
@@ -10,7 +10,7 @@
       {{ error }}
       <button @click="retry" class="retry-btn" :disabled="retrying">
         {{ retrying ? "再読み込み中…" : "再試行" }}
-      </button>
+      </button><br>カスタムエンドポイントを設定していない場合、設定からカスタムエンドポイントのを追加してください　＊1~3分で作れます
     </div>
 
     <!-- 成功時の動画リスト -->
