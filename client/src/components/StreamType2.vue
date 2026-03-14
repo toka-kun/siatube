@@ -4,17 +4,22 @@
     <button @click="reloadStream" class="reload-button">再取得</button>
   </div>
   <div v-else-if="selectedQuality && availableQualities.length > 0" class="video-container">
-    <!-- m3u8 再生が選択された端末かつ選択画質が HLS URL を持つ場合 -->
-    <template v-if="useM3u8Playback() && sources[selectedQuality]?.url">
+    <!-- single-stream (audio+video) が使える場合 -->
+    <template v-if="isSingleStreamEntry(sources[selectedQuality])">
       <video
         ref="videoRef"
         controls
         :autoplay="autoplayEnabled"
         :loop="repeatEnabled"
-        :src="sources[selectedQuality]?.url"
-        type="application/x-mpegURL"
         :key="sources[selectedQuality]?.url"
-      ></video>
+      >
+        <source
+          v-for="s in getSingleStreamSources(sources[selectedQuality])"
+          :key="s.url"
+          :src="s.url"
+          :type="s.mimeType || (s.isM3u8 ? 'application/x-mpegURL' : undefined)"
+        />
+      </video>
 
       <div v-if="showUnmutePrompt" class="unmute-prompt" @click.stop="handleUnmuteClick">
         ミュートを解除する
@@ -54,17 +59,37 @@
       <div v-if="isQualitySwitching" class="block-overlay" aria-hidden="true"></div>
     </template>
 
-    <!-- その他: videourl (video+audio) の再生 -->
+    <!-- その他: videourl (video+audio) の再生 / audio-only -->
     <template v-else>
-      <video ref="videoRef" preload="auto" :autoplay="autoplayEnabled" controls>
-        <source :src="sources[selectedQuality]?.video?.url" :type="sources[selectedQuality]?.video?.mimeType" />
-      </video>
-      <div v-if="showUnmutePrompt" class="unmute-prompt" @click.stop="handleUnmuteClick">
-        ミュートを解除する
-      </div>
-      <audio ref="audioRef" preload="auto" style="display:none;" autoplay>
-        <source :src="sources[selectedQuality]?.audio?.url" :type="sources[selectedQuality]?.audio?.mimeType" />
-      </audio>
+      <template v-if="isAudioOnlyEntry(sources[selectedQuality])">
+        <div class="audio-only">
+          <audio ref="audioRef" preload="auto" :autoplay="autoplayEnabled" controls>
+            <source :src="sources[selectedQuality]?.audio?.url" :type="sources[selectedQuality]?.audio?.mimeType" />
+          </audio>
+        </div>
+      </template>
+      <template v-else>
+        <video
+          ref="videoRef"
+          preload="auto"
+          :autoplay="autoplayEnabled"
+          controls
+          :key="separateAvKey"
+        >
+          <source
+            v-for="s in getVideoSourcesForEntry(sources[selectedQuality])"
+            :key="s.url"
+            :src="s.url"
+            :type="s.mimeType"
+          />
+        </video>
+        <div v-if="showUnmutePrompt" class="unmute-prompt" @click.stop="handleUnmuteClick">
+          ミュートを解除する
+        </div>
+        <audio ref="audioRef" preload="auto" style="display:none;" autoplay :key="separateAvKey">
+          <source :src="sources[selectedQuality]?.audio?.url" :type="sources[selectedQuality]?.audio?.mimeType" />
+        </audio>
+      </template>
 
       <div class="settings-box" v-show="settingsVisible">
         <label>
@@ -107,6 +132,8 @@
 import { ref, watch, onMounted, nextTick, onBeforeUnmount } from "vue";
 import { apiRequest } from "@/services/requestManager";
 import { setupSyncPlayback } from "@/components/syncPlayback";
+import { parseStream2Response } from "@/utils/type2StreamParser";
+import { loadPreferredQuality } from "@/utils/settingsManager";
 
 const props = defineProps({
   videoId: { type: String, required: true }
@@ -126,6 +153,7 @@ const playbackRates = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 3, 4];
 const diffText = ref("0");
 const videoRef = ref(null);
 const audioRef = ref(null);
+const separateAvKey = ref(0);
 const repeatEnabled = ref(false);
 // デフォルトはオフにする
 const AUTOPLAY_SETTING_KEY = 'yt_autoplay_enabled_v1';
@@ -193,8 +221,7 @@ function pushToHistory(id) {
 }
 
 // 自動再生候補選定
-// window.__autoplayCandidates (配列) があればそこから選ぶ
-// DOM 上に data-video-id 属性を持つ要素があれば上から選ぶ
+// window.__autoplayCandidates があればそこから選ぶ。なければ DOM の data-video-id から選ぶ。
 function getAutoplayCandidateId() {
   try {
     const recent = new Set(loadPlayHistory());
@@ -205,26 +232,19 @@ function getAutoplayCandidateId() {
     const filterConfig = window.__autoplayDurationFilter || { enabled: false, maxSeconds: 240 };
     const maxSeconds = filterConfig.enabled ? filterConfig.maxSeconds : Infinity;
 
-    console.log(`[getAutoplayCandidateId] filterConfig:`, filterConfig, `maxSeconds: ${maxSeconds}`);
-
     // Helper function to check if a video passes duration filter
     function passesFilter(durationStr) {
       if (!filterConfig.enabled) {
-        console.log(`    passesFilter: filter disabled → true`);
         return true; // No filter
       }
       if (!durationStr) {
-        console.log(`    passesFilter: no duration info → true`);
         return true; // No duration info, allow it
       }
       const duration = parseInt(durationStr, 10);
       if (isNaN(duration)) {
-        console.log(`    passesFilter: invalid duration "${durationStr}" → true`);
         return true; // Invalid duration, allow it
       }
-      const passes = duration <= maxSeconds;
-      console.log(`    passesFilter: ${duration}s <= ${maxSeconds}s? → ${passes}`);
-      return passes;
+      return duration <= maxSeconds;
     }
 
     // list from window variable
@@ -242,35 +262,20 @@ function getAutoplayCandidateId() {
       const durationStr = el.getAttribute('data-duration');
       
       if (!id) continue;
-      if (recent.has(id)) {
-        console.log(`Checking video ${id}: SKIPPED (in recent history)`);
-        continue;
-      }
+      if (recent.has(id)) continue;
       
       foundAnyVideo = true;
       
-      // Debug logging
-      console.log(`Checking video ${id}: duration="${durationStr}"`);
-      
       // Check duration filter - MUST pass filter to be selected
       if (!passesFilter(durationStr)) {
-        console.log(`  → SKIPPED: duration exceeds limit`);
         continue; // Skip this video, duration exceeds limit or invalid
       }
-      
-      console.log(`  → SELECTED`);
       return id; // Found a suitable candidate
     }
     
     // No suitable candidate found - signal to parent
-    if (foundAnyVideo && filterConfig.enabled) {
-      // Videos exist but don't match filter criteria
-      console.log(`[getAutoplayCandidateId] No suitable candidate found. Emitting autoplay-no-suitable-video`);
-      emit('autoplay-no-suitable-video');
-    }
-  } catch (e) {
-    console.error("getAutoplayCandidateId error:", e);
-  }
+    if (foundAnyVideo && filterConfig.enabled) emit('autoplay-no-suitable-video');
+  } catch (e) {}
   return null;
 }
 
@@ -309,7 +314,6 @@ onMounted(() => {
   try {
     if (videoRef.value) videoRef.value.addEventListener('timeupdate', onTimeUpdateLoopHandler);
   } catch (e) {}
-  try { fetchStreamUrl(props.videoId); } catch (e) {}
 });
 
 onBeforeUnmount(() => {
@@ -337,6 +341,79 @@ function useM3u8Playback() {
     if (isAppleDevice()) return true;
     return nativeHlsSupported.value === true;
   } catch (e) { return false; }
+}
+
+function isSingleStreamEntry(entry) {
+  try {
+    const list = getSingleStreamSources(entry);
+    return Array.isArray(list) && list.length > 0;
+  } catch (e) { return false; }
+}
+
+function getSingleStreamSources(entry) {
+  try {
+    if (!entry) return [];
+    const rawList = Array.isArray(entry.sources) ? entry.sources : (entry.url ? [{ url: entry.url, mimeType: entry.mimeType, isM3u8: !!entry.isM3u8 }] : []);
+    if (rawList.length === 0) return [];
+    if (useM3u8Playback()) return rawList;
+    return preferH264First(rawList.filter((s) => !s.isM3u8));
+  } catch (e) {
+    return [];
+  }
+}
+
+function applyVideoSources(videoEl, sourcesList) {
+  if (!videoEl) return;
+  try {
+    while (videoEl.firstChild) videoEl.removeChild(videoEl.firstChild);
+    for (const s of sourcesList) {
+      if (!s || !s.url) continue;
+      const sourceEl = document.createElement('source');
+      sourceEl.src = s.url;
+      if (s.mimeType) sourceEl.type = s.mimeType;
+      videoEl.appendChild(sourceEl);
+    }
+    videoEl.load();
+  } catch (e) {}
+}
+
+function isAudioOnlyEntry(entry) {
+  try {
+    return !!(entry && entry.audio && !entry.video && !entry.url);
+  } catch (e) { return false; }
+}
+
+function getVideoSourcesForEntry(entry) {
+  try {
+    const sourcesList = entry?.video?.sources;
+    if (Array.isArray(sourcesList) && sourcesList.length > 0) return preferH264First(sourcesList);
+    if (entry?.video?.url) return preferH264First([{ url: entry.video.url, mimeType: entry.video.mimeType }]);
+    return [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function preferH264First(list) {
+  try {
+    if (!Array.isArray(list) || list.length <= 1) return list || [];
+    const isH264 = (s) => {
+      const mt = (s && s.mimeType) ? String(s.mimeType).toLowerCase() : "";
+      const url = (s && s.url) ? String(s.url).toLowerCase() : "";
+      if (mt.includes("video/mp4")) return true;
+      if (mt.includes("avc1") || mt.includes("h264")) return true;
+      if (url.endsWith(".mp4")) return true;
+      if (url.includes("codecs=avc1") || url.includes("codecs%3davc1")) return true;
+      return false;
+    };
+    return list.slice().sort((a, b) => {
+      const aw = isH264(a) ? 1 : 0;
+      const bw = isH264(b) ? 1 : 0;
+      return bw - aw;
+    });
+  } catch (e) {
+    return list || [];
+  }
 }
 
 function getBufferedAhead(el) {
@@ -587,18 +664,32 @@ function reloadSrc() {
   const entry = sources.value[sel];
   if (!entry) return;
 
-  if (entry.url && useM3u8Playback()) {
-    // HLS
+  if (isSingleStreamEntry(entry)) {
+    // single-stream
     if (videoRef.value) {
-      videoRef.value.src = entry.url;
-      videoRef.value.load();
+      applyVideoSources(videoRef.value, getSingleStreamSources(entry));
+    }
+    if (audioRef.value) {
+      const aSource = audioRef.value.querySelector('source');
+      if (aSource) aSource.removeAttribute('src');
+      audioRef.value.removeAttribute('src');
+      audioRef.value.load();
+    }
+  } else if (isAudioOnlyEntry(entry)) {
+    if (audioRef.value && entry.audio.url) {
+      const source = audioRef.value.querySelector('source');
+      if (source) {
+        source.src = entry.audio.url;
+        if (entry.audio.mimeType) source.type = entry.audio.mimeType;
+      } else {
+        audioRef.value.src = entry.audio.url;
+      }
+      audioRef.value.load();
     }
   } else if (entry.video) {
     // video+audio
-    if (videoRef.value && entry.video.url) {
-      const source = videoRef.value.querySelector('source');
-      if (source) source.src = entry.video.url;
-      videoRef.value.load();
+    if (videoRef.value) {
+      applyVideoSources(videoRef.value, getVideoSourcesForEntry(entry));
     }
     if (audioRef.value && entry.audio.url) {
       const source = audioRef.value.querySelector('source');
@@ -611,26 +702,32 @@ function reloadSrc() {
 function checkPlayback() {
   if (videoRef.value) {
     videoRef.value.play().catch(() => {
-      console.log('Video playback failed, reloading src');
       reloadSrc();
     });
   }
   if (audioRef.value) {
     audioRef.value.play().catch(() => {
-      console.log('Audio playback failed, reloading src');
       reloadSrc();
     });
   }
 }
 
-// HLS 切替時の共通セットアップ（再生位置を維持）
+// single-stream 切替時の共通セットアップ（再生位置を維持）
 function applyHlsSetup(prevTime = 0) {
   isQualitySwitching.value = true;
   setTimeout(() => { isQualitySwitching.value = false; }, 1000);
 
   // pause before src swap (テンプレート側で :key により再レンダリングされる)
   try { if (videoRef.value) { prevTime = videoRef.value.currentTime || prevTime; videoRef.value.pause(); } } catch (e) {}
-  try { if (audioRef.value) audioRef.value.pause(); } catch (e) {}
+  try {
+    if (audioRef.value) {
+      audioRef.value.pause();
+      const aSource = audioRef.value.querySelector('source');
+      if (aSource) aSource.removeAttribute('src');
+      audioRef.value.removeAttribute('src');
+      audioRef.value.load();
+    }
+  } catch (e) {}
 
   nextTick(() => {
     // 再レンダリング後に時間を復元して再生を試みる
@@ -685,8 +782,8 @@ watch(selectedQuality, () => {
 
   if (!entry) return;
 
-  // If entry has HLS URL and device should use HLS
-  if (entry.url && useM3u8Playback()) {
+  // If entry has single-stream URL and device can use it
+  if (isSingleStreamEntry(entry)) {
     // preserve position and apply HLS setup
     let prevTime = 0;
     try { if (videoRef.value) prevTime = videoRef.value.currentTime || 0; } catch (e) {}
@@ -694,8 +791,50 @@ watch(selectedQuality, () => {
     return;
   }
 
+  // Audio-only
+  if (isAudioOnlyEntry(entry)) {
+    isQualitySwitching.value = true;
+    setTimeout(() => { isQualitySwitching.value = false; }, 1000);
+    nextTick(() => {
+      try {
+        if (audioRef.value && entry.audio?.url) {
+          const source = audioRef.value.querySelector('source');
+          if (source) {
+            source.src = entry.audio.url;
+            if (entry.audio.mimeType) source.type = entry.audio.mimeType;
+          } else {
+            audioRef.value.src = entry.audio.url;
+          }
+          audioRef.value.load();
+        }
+      } catch (e) {}
+      applyRepeatAndAutoplay();
+      const granted2 = (() => { try { return localStorage.getItem(USER_GESTURE_KEY) === '1'; } catch (e) { return false; } })();
+      try {
+        if (audioRef.value) {
+          audioRef.value.muted = !granted2;
+          if (autoplayEnabled.value) scheduleAutoplay();
+        }
+        attachBufferListeners();
+        showUnmutePrompt.value = !granted2;
+        if (!granted2) {
+          window.addEventListener('click', onFirstUserGesture, { once: true });
+          window.addEventListener('touchstart', onFirstUserGesture, { once: true });
+        } else {
+          scheduleAutoplay();
+        }
+      } catch (e) {}
+      if (audioRef.value) {
+        audioRef.value.addEventListener('canplay', checkPlayback, { once: true });
+      }
+    });
+    return;
+  }
+
   // Otherwise use legacy video+audio sync flow (entry.video must exist)
   if (entry.video) {
+    // Force element re-create for separated AV (Safari/iOS cache issues)
+    separateAvKey.value += 1;
     isQualitySwitching.value = true;
     setTimeout(() => {
       isQualitySwitching.value = false;
@@ -802,118 +941,29 @@ async function fetchStreamUrl(id) {
       jsonpFallback: false,
     });
 
-    // parse videourl and m3u8 into separate maps
-    let srcs = {}; // progressive: { video: {url,mimeType}, audio: {...} }
-    let qualities = [];
-    let m3u8srcs = {}; // hls: { url, mimeType }
-    let m3u8Qualities = [];
-
-    // videourl: support array/object
-    if (Array.isArray(data.videourl)) {
-      data.videourl.forEach((item) => {
-        const key = Object.keys(item)[0];
-        if (/^\d{3,4}p$/.test(key)) {
-          qualities.push(key);
-          const vv = item[key];
-          srcs[key] = {
-            video: { url: vv.video?.url, mimeType: vv.video?.mimeType || "video/mp4" },
-            audio: { url: vv.audio?.url, mimeType: vv.audio?.mimeType || "audio/webm" }
-          };
-        }
-      });
-    } else if (typeof data.videourl === 'object' && data.videourl !== null) {
-      Object.keys(data.videourl).forEach((key) => {
-        if (/^\d{3,4}p$/.test(key)) {
-          qualities.push(key);
-          const vv = data.videourl[key];
-          srcs[key] = {
-            video: { url: vv.video?.url, mimeType: vv.video?.mimeType || "video/mp4" },
-            audio: { url: vv.audio?.url, mimeType: vv.audio?.mimeType || "audio/webm" }
-          };
-        }
-      });
-    }
-
-    // m3u8: support array/object
-    if (Array.isArray(data.m3u8)) {
-      data.m3u8.forEach((item) => {
-        const key = Object.keys(item)[0];
-        if (/^\d{3,4}p$/.test(key)) {
-          let murl = item[key]?.url;
-          if (typeof murl === 'object' && murl?.url) murl = murl.url;
-          if (murl) {
-            m3u8Qualities.push(key);
-            m3u8srcs[key] = { url: murl, mimeType: "application/x-mpegURL" };
-          }
-        }
-      });
-    } else if (typeof data.m3u8 === 'object' && data.m3u8 !== null) {
-      Object.keys(data.m3u8).forEach((key) => {
-        if (/^\d{3,4}p$/.test(key)) {
-          let murl = data.m3u8[key]?.url;
-          if (typeof murl === 'object' && murl?.url) murl = murl.url;
-          if (murl) {
-            m3u8Qualities.push(key);
-            m3u8srcs[key] = { url: murl, mimeType: "application/x-mpegURL" };
-          }
-        }
-      });
-    }
-
-    hasM3u8.value = m3u8Qualities.length > 0;
-
-    const allQualSet = new Set([...(qualities || []), ...(m3u8Qualities || [])]);
-    let allQuals = Array.from(allQualSet).sort((a,b) => parseInt(b) - parseInt(a));
-
-    // Build sources but keep types distinct: HLS entries have .url, progressive entries have .video/.audio
-    const combined = {};
-    const qualityLabels = {}; // Map from internalKey to display label
-    
-    allQuals.forEach((q) => {
-      // Add m3u8 source with [quality] label
-      if (m3u8srcs[q]) {
-        combined[q] = { url: m3u8srcs[q].url, mimeType: m3u8srcs[q].mimeType };
-        qualityLabels[q] = `[${q}]`;
-      }
-      // Add progressive source (video+audio)
-      if (srcs[q]) {
-        // If m3u8 already exists for this quality, use quality2 label
-        if (m3u8srcs[q]) {
-          const key2 = `${q}_2`;
-          combined[key2] = srcs[q];
-          qualityLabels[key2] = `[${q}2]`;
-        } else {
-          // No m3u8, use simple quality label
-          combined[q] = srcs[q];
-          qualityLabels[q] = q;
-        }
-      }
-    });
-
-    if (Object.keys(combined).length === 0) {
+    const parsed = parseStream2Response(data);
+    if (!parsed || Object.keys(parsed.sources || {}).length === 0) {
       error.value = "利用可能なストリームがありません。";
       loading.value = false;
       return;
     }
 
-    // decide default quality: prefer m3u8 if available
-    const defaultQuality = ["1080p","720p","480p"].find(q => combined[q] && (m3u8srcs[q] || !srcs[q])) || Object.keys(combined)[0];
-
-    sources.value = combined;
-    
-    // Store quality labels for display
-    qualityLabels.value = qualityLabels;
-    
-    // availableQualities should be internal keys, sorted by label display
-    const internalKeys = Object.keys(combined).sort((a, b) => {
-      const aNum = parseInt(a.replace(/_2$/, ''));
-      const bNum = parseInt(b.replace(/_2$/, ''));
-      if (bNum !== aNum) return bNum - aNum; // sort by resolution desc
-      return a.includes('_2') ? 1 : -1; // sort _2 variants after main
-    });
-    availableQualities.value = internalKeys;
-    
-    selectedQuality.value = defaultQuality || Object.keys(combined)[0];
+    sources.value = parsed.sources;
+    qualityLabels.value = parsed.qualityLabels || {};
+    availableQualities.value = parsed.availableQualities || [];
+    const preferred = (() => {
+      try { return loadPreferredQuality(); } catch (e) { return "auto"; }
+    })();
+    const resolvePreferred = (pref, list) => {
+      if (!pref || pref === "auto") return "";
+      if (list.includes(pref)) return pref;
+      const alt = `${pref}_2`;
+      if (list.includes(alt)) return alt;
+      return "";
+    };
+    const preferredResolved = resolvePreferred(preferred, availableQualities.value);
+    selectedQuality.value = preferredResolved || parsed.defaultQuality || availableQualities.value[0] || "";
+    hasM3u8.value = !!parsed.hasM3u8;
 
     // DOM 更新後のセットアップ
     nextTick().then(() => {
@@ -932,10 +982,11 @@ async function fetchStreamUrl(id) {
         } catch (e) {}
       }
 
-      // If selected entry has HLS URL and device can/wants HLS -> use single video HLS flow
-      if (selEntry?.url && useM3u8Playback()) {
+      // If selected entry has single-stream URL and device can use it -> use single video flow
+      if (isSingleStreamEntry(selEntry)) {
         try {
           if (videoRef.value) {
+            applyVideoSources(videoRef.value, getSingleStreamSources(selEntry));
             videoRef.value.muted = !granted;
             if (autoplayEnabled.value) scheduleAutoplay();
           }
@@ -949,6 +1000,32 @@ async function fetchStreamUrl(id) {
         // Add playback check
         if (videoRef.value) {
           videoRef.value.addEventListener('canplay', checkPlayback, { once: true });
+        }
+      } else if (isAudioOnlyEntry(selEntry)) {
+        try {
+          if (audioRef.value && selEntry.audio?.url) {
+            const source = audioRef.value.querySelector('source');
+            if (source) {
+              source.src = selEntry.audio.url;
+              if (selEntry.audio.mimeType) source.type = selEntry.audio.mimeType;
+            } else {
+              audioRef.value.src = selEntry.audio.url;
+            }
+            audioRef.value.load();
+          }
+          if (audioRef.value) {
+            audioRef.value.muted = !granted;
+            if (autoplayEnabled.value) scheduleAutoplay();
+          }
+          attachBufferListeners();
+          showUnmutePrompt.value = !granted;
+          if (!granted) {
+            window.addEventListener('click', onFirstUserGesture, { once: true });
+            window.addEventListener('touchstart', onFirstUserGesture, { once: true });
+          }
+        } catch (e) {}
+        if (audioRef.value) {
+          audioRef.value.addEventListener('canplay', checkPlayback, { once: true });
         }
       } else {
         // Use legacy video+audio synchronization if video URL exists
@@ -1014,7 +1091,11 @@ async function fetchStreamUrl(id) {
 watch(
   () => props.videoId,
   (newId) => {
-    if (newId) fetchStreamUrl(newId);
+    if (newId) {
+      fetchStreamUrl(newId);
+    } else {
+      // videoId が空のときは取得をスキップ
+    }
   },
   { immediate: true }
 );
@@ -1056,6 +1137,22 @@ watch(videoRef, (newEl, oldEl) => {
   left: 0;
   width: 100%;
   height: 100%;
+}
+.audio-only {
+  position: relative;
+  width: 100%;
+  height: auto;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.audio-only audio {
+  padding-top: 200px;
+  display: block;
+  position: static;
+  width: 100%;
+  height: 48px;
 }
 .settings-box {
   position: absolute;

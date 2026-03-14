@@ -3,7 +3,11 @@
     <!-- バナー -->
     <div
       class="banner"
-      :style="{ backgroundImage: loadingChannel ? '' : `url(${channel.banner || defaultBanner})` }"
+      :style="{
+        backgroundImage: loadingChannel
+          ? ''
+          : `url(${channel.banner || defaultBanner})`,
+      }"
     >
       <div v-if="loadingChannel" class="skeleton"></div>
     </div>
@@ -20,15 +24,43 @@
         <div v-else class="skeleton avatar"></div>
       </div>
       <div class="info">
-        <div v-if="!loadingChannel" style="display:flex;align-items:center;gap:12px;">
-          <h1 style="font-size: 2.1em; margin-block-end: 0.4em; margin:0">{{ channel.title }}</h1>
-          <button class="subscribe-btn" :class="{ subscribed }" @click="toggleSubscribeOnChannel" :title="subscribed ? '登録解除' : '登録'">{{ subscribed ? '登録解除' : '登録' }}</button>
+        <div
+          v-if="!loadingChannel"
+          style="display: flex; align-items: center; gap: 12px"
+        >
+          <h1 style="font-size: 2.1em; margin-block-end: 0.4em; margin: 0">
+            {{ channel.title }}
+          </h1>
+          <button
+            class="subscribe-btn"
+            :class="{ subscribed }"
+            @click="toggleSubscribeOnChannel"
+            :title="subscribed ? '登録解除' : '登録'"
+          >
+            {{ subscribed ? "登録解除" : "登録" }}
+          </button>
         </div>
-        <div v-else class="skeleton skeleton-text" style="width: 60%; height: 2.1em; margin-bottom: 0.4em;"></div>
-        <p v-if="!loadingChannel" class="video-count">{{ channel.videoCount }}</p>
-        <div v-else class="skeleton skeleton-text" style="width: 30%; height: 1.2em; margin-bottom: 0.4em;"></div>
-        <p v-if="!loadingChannel" class="description">{{ channel.description }}</p>
-        <div v-else class="skeleton skeleton-text" style="width: 90%; height: 2em;"></div>
+        <div
+          v-else
+          class="skeleton skeleton-text"
+          style="width: 60%; height: 2.1em; margin-bottom: 0.4em"
+        ></div>
+        <p v-if="!loadingChannel" class="video-count">
+          {{ channel.videoCount }}
+        </p>
+        <div
+          v-else
+          class="skeleton skeleton-text"
+          style="width: 30%; height: 1.2em; margin-bottom: 0.4em"
+        ></div>
+        <p v-if="!loadingChannel" class="description">
+          {{ channel.description }}
+        </p>
+        <div
+          v-else
+          class="skeleton skeleton-text"
+          style="width: 90%; height: 2em"
+        ></div>
       </div>
     </div>
 
@@ -40,10 +72,14 @@
         tabindex="0"
         @click="tab = 'home'"
         @keydown.enter.space.prevent="tab = 'home'"
-        style="margin-right: 24px;"
+        style="margin-right: 24px"
       >
         <span v-if="!loadingChannel">ホーム</span>
-        <span v-else class="skeleton skeleton-text" style="width: 60px; height: 1.3em;"></span>
+        <span
+          v-else
+          class="skeleton skeleton-text"
+          style="width: 60px; height: 1.3em"
+        ></span>
       </div>
       <div
         :class="{ active: tab === 'videos' }"
@@ -53,7 +89,11 @@
         @keydown.enter.space.prevent="tab = 'videos'"
       >
         <span v-if="!loadingChannel">動画</span>
-        <span v-else class="skeleton skeleton-text" style="width: 60px; height: 1.3em;"></span>
+        <span
+          v-else
+          class="skeleton skeleton-text"
+          style="width: 60px; height: 1.3em"
+        ></span>
       </div>
     </div>
 
@@ -73,21 +113,71 @@
               class="thumbnail"
               @error="onImageError($event, channel.topVideo.videoId)"
             />
-            <div v-else class="skeleton" style="width: 100%; height: 100%;"></div>
-            <span class="duration" v-if="channel.topVideo.duration && !loadingChannel">
+            <div
+              v-else
+              class="skeleton"
+              style="width: 100%; height: 100%"
+            ></div>
+            <span
+              class="duration"
+              v-if="channel.topVideo.duration && !loadingChannel"
+            >
               {{ channel.topVideo.duration }}
-            </span>       
-            <div v-else-if="loadingChannel" class="skeleton skeleton-text" style="width: 40px; height: 1em; position: absolute; bottom: 6px; right: 6px;"></div>
+            </span>
+            <div
+              v-else-if="loadingChannel"
+              class="skeleton skeleton-text"
+              style="
+                width: 40px;
+                height: 1em;
+                position: absolute;
+                bottom: 6px;
+                right: 6px;
+              "
+            ></div>
           </div>
           <div class="top-video-info">
-            <h3 v-if="!loadingChannel" style="margin-block-start: 0em; font-size: 1.45em; margin-block-end: 0.5em;">{{ channel.topVideo.title }}</h3>
-            <div v-else class="skeleton skeleton-text" style="width: 70%; height: 1.45em; margin-bottom: 0.5em;"></div>
-            <p v-if="!loadingChannel"><strong>再生回数:</strong> {{ channel.topVideo.viewCount }}</p>
-            <div v-else class="skeleton skeleton-text" style="width: 40%; height: 1em;"></div>
-            <p v-if="!loadingChannel"><strong>投稿日:</strong> {{ channel.topVideo.published }}</p>
-            <div v-else class="skeleton skeleton-text" style="width: 40%; height: 1em;"></div>
-            <p v-if="!loadingChannel" class="description-text" v-html="channel.topVideo.description"></p>
-            <div v-else class="skeleton skeleton-text" style="width: 90%; height: 2em;"></div>
+            <h3
+              v-if="!loadingChannel"
+              style="
+                margin-block-start: 0em;
+                font-size: 1.45em;
+                margin-block-end: 0.5em;
+              "
+            >
+              {{ channel.topVideo.title }}
+            </h3>
+            <div
+              v-else
+              class="skeleton skeleton-text"
+              style="width: 70%; height: 1.45em; margin-bottom: 0.5em"
+            ></div>
+            <p v-if="!loadingChannel">
+              <strong>再生回数:</strong> {{ channel.topVideo.viewCount }}
+            </p>
+            <div
+              v-else
+              class="skeleton skeleton-text"
+              style="width: 40%; height: 1em"
+            ></div>
+            <p v-if="!loadingChannel">
+              <strong>投稿日:</strong> {{ channel.topVideo.published }}
+            </p>
+            <div
+              v-else
+              class="skeleton skeleton-text"
+              style="width: 40%; height: 1em"
+            ></div>
+            <p
+              v-if="!loadingChannel"
+              class="description-text"
+              v-html="channel.topVideo.description"
+            ></p>
+            <div
+              v-else
+              class="skeleton skeleton-text"
+              style="width: 90%; height: 2em"
+            ></div>
           </div>
         </router-link>
       </section>
@@ -100,9 +190,25 @@
         >
           <h2 class="playlist-title">
             <span v-if="!loadingChannel">{{ playlist.title }}</span>
-            <span v-else class="skeleton skeleton-text" style="width: 40%; height: 1.2em;"></span>
-            <router-link v-if="playlist.playlistId && !loadingChannel" :to="`/playlist?list=${playlist.playlistId}`" class="playlist-video-link-to">▶ 全てを再生<span style="font-size: small; color: var(--text-secondary);">(プレイリスト再生モード)</span></router-link>
-            <span v-else-if="loadingChannel" class="skeleton skeleton-text" style="width: 80px; height: 1em; margin-left: 10px;"></span>
+            <span
+              v-else
+              class="skeleton skeleton-text"
+              style="width: 40%; height: 1.2em"
+            ></span>
+            <router-link
+              v-if="playlist.playlistId && !loadingChannel"
+              :to="`/playlist?list=${playlist.playlistId}`"
+              class="playlist-video-link-to"
+              >▶ 全てを再生<span
+                style="font-size: small; color: var(--text-secondary)"
+                >(プレイリスト再生モード)</span
+              ></router-link
+            >
+            <span
+              v-else-if="loadingChannel"
+              class="skeleton skeleton-text"
+              style="width: 80px; height: 1em; margin-left: 10px"
+            ></span>
           </h2>
           <div class="playlist-items-scroll">
             <div
@@ -110,7 +216,14 @@
               :key="item.videoId || idx"
               class="playlist-item"
             >
-              <router-link :to="item.icon ? `/channel/${item.videoId}` : `/watch?v=${item.videoId}`" class="video-link">
+              <router-link
+                :to="
+                  item.icon
+                    ? `/channel/${item.videoId}`
+                    : `/watch?v=${item.videoId}`
+                "
+                class="video-link"
+              >
                 <div class="thumbnail-wrapper small-thumb">
                   <div>
                     <!-- icon がある場合 -->
@@ -131,7 +244,9 @@
                     <!-- icon がない場合 -->
                     <template v-else-if="!item.icon && !loadingChannel">
                       <img
-                        :src="item.thumbnail || getPrimaryThumbnail(item.videoId)"
+                        :src="
+                          item.thumbnail || getPrimaryThumbnail(item.videoId)
+                        "
                         alt="動画サムネイル"
                         class="thumbnail"
                         @error="onImageError($event, item.videoId)"
@@ -141,17 +256,67 @@
                       <div class="skeleton thumbnail"></div>
                     </template>
                   </div>
-                  <span class="duration" v-if="item.duration && !loadingChannel">{{ item.duration }}</span>
-                  <div v-else-if="loadingChannel" class="skeleton skeleton-text" style="width: 40px; height: 1em; position: absolute; bottom: 6px; right: 6px;"></div>
+                  <span
+                    class="duration"
+                    v-if="item.duration && !loadingChannel"
+                    >{{ item.duration }}</span
+                  >
+                  <div
+                    v-else-if="loadingChannel"
+                    class="skeleton skeleton-text"
+                    style="
+                      width: 40px;
+                      height: 1em;
+                      position: absolute;
+                      bottom: 6px;
+                      right: 6px;
+                    "
+                  ></div>
                 </div>
-                <p v-if="item.icon && !loadingChannel" class="center-text">{{ item.title }}</p>
-                <div v-else-if="item.icon && loadingChannel" class="skeleton skeleton-text center-text" style="width: 60%; height: 1em;"></div>
-                <p :class="title" v-if="!item.icon && !loadingChannel" class="left-text" style="font-weight: 600;">{{ item.title }}</p>
-                <div v-else-if="!item.icon && loadingChannel" class="skeleton skeleton-text left-text" style="width: 80%; height: 1em;"></div>
-                <p class="author" v-if="!item.icon && !loadingChannel">{{ item.author }}</p>
-                <div v-else-if="!item.icon && loadingChannel" class="skeleton skeleton-text left-text" style="width: 40%; height: 1em;"></div>
-                <p class="meta" :class="item.icon ? 'center-text' : 'left-text'" v-if="!loadingChannel">{{ item.viewCount }}<template v-if="item.published">・{{ item.published }}</template></p>
-                <div v-else class="skeleton skeleton-text" style="width: 60%; height: 1em;"></div>
+                <p v-if="item.icon && !loadingChannel" class="center-text">
+                  {{ item.title }}
+                </p>
+                <div
+                  v-else-if="item.icon && loadingChannel"
+                  class="skeleton skeleton-text center-text"
+                  style="width: 60%; height: 1em"
+                ></div>
+                <p
+                  :class="title"
+                  v-if="!item.icon && !loadingChannel"
+                  class="left-text"
+                  style="font-weight: 600"
+                >
+                  {{ item.title }}
+                </p>
+                <div
+                  v-else-if="!item.icon && loadingChannel"
+                  class="skeleton skeleton-text left-text"
+                  style="width: 80%; height: 1em"
+                ></div>
+                <p class="author" v-if="!item.icon && !loadingChannel">
+                  {{ item.author }}
+                </p>
+                <div
+                  v-else-if="!item.icon && loadingChannel"
+                  class="skeleton skeleton-text left-text"
+                  style="width: 40%; height: 1em"
+                ></div>
+                <p
+                  class="meta"
+                  :class="item.icon ? 'center-text' : 'left-text'"
+                  v-if="!loadingChannel"
+                >
+                  {{ item.viewCount
+                  }}<template v-if="item.published"
+                    >・{{ item.published }}</template
+                  >
+                </p>
+                <div
+                  v-else
+                  class="skeleton skeleton-text"
+                  style="width: 60%; height: 1em"
+                ></div>
               </router-link>
             </div>
           </div>
@@ -160,25 +325,46 @@
     </div>
     <!-- 動画タブ -->
     <div v-else-if="tab === 'videos'" class="tab-content">
-        <VideoList :playlist-id="channel.uploadsPlaylistId" displayType="channel" />
+      <VideoList
+        :playlist-id="channel.uploadsPlaylistId"
+        displayType="channel"
+      />
     </div>
   </section>
-  <section v-else-if="loadingChannel" class="loading">
-    読み込み中...<br>読み込む速度を早くする方法。↓<br>右上の設定マークからカスタムエンドポイントのを追加してください　＊方法は簡単で1~3分で作れます。
-  </section>
+  <section v-else-if="loadingChannel" class="loading">読み込み中...</section>
   <section v-else class="error-section">
-    <div class="skeleton" style="width: 100%; height: 180px; margin-bottom: 24px;"></div>
-    <div class="skeleton skeleton-text" style="width: 60%; height: 2.1em; margin: 0 auto 16px auto;"></div>
-    <div class="skeleton skeleton-text" style="width: 30%; height: 1.2em; margin: 0 auto 16px auto;"></div>
-    <div class="skeleton skeleton-text" style="width: 90%; height: 2em; margin: 0 auto 16px auto;"></div>
-    <p style="color: var(--accent-weak); margin: 24px 0;">チャンネル情報の取得に失敗しました。</p>
+    <div
+      class="skeleton"
+      style="width: 100%; height: 180px; margin-bottom: 24px"
+    ></div>
+    <div
+      class="skeleton skeleton-text"
+      style="width: 60%; height: 2.1em; margin: 0 auto 16px auto"
+    ></div>
+    <div
+      class="skeleton skeleton-text"
+      style="width: 30%; height: 1.2em; margin: 0 auto 16px auto"
+    ></div>
+    <div
+      class="skeleton skeleton-text"
+      style="width: 90%; height: 2em; margin: 0 auto 16px auto"
+    ></div>
+    <p style="color: var(--accent-weak); margin: 24px 0">
+      チャンネル情報の取得に失敗しました。
+    </p>
     <button class="reload-btn" @click="reloadChannel">再取得</button>
   </section>
   <div v-if="tab === 'home'" class="page-end">
     <div>
-      <br>
-      <p v-if="!loadingChannel" style="color: var(--text-primary);">すべての動画を見るには「動画」セクションに移動してください</p>
-      <div v-else class="skeleton skeleton-text" style="width: 60%; height: 1em; margin: 0 auto;"></div>
+      <br />
+      <p v-if="!loadingChannel" style="color: var(--text-primary)">
+        すべての動画を見るには「動画」セクションに移動してください
+      </p>
+      <div
+        v-else
+        class="skeleton skeleton-text"
+        style="width: 60%; height: 1em; margin: 0 auto"
+      ></div>
     </div>
     <div class="tabs">
       <div
@@ -189,20 +375,26 @@
         @click="tab = 'videos'"
         @keydown.enter.space.prevent="tab = 'videos'"
       >
-        <span v-if="!loadingChannel">動画セクションに移動<img :src="settingIcon" width="21" height="21"></span>
-        <span v-else class="skeleton skeleton-text" style="width: 120px; height: 1.3em;"></span>
+        <span v-if="!loadingChannel"
+          >動画セクションに移動<img :src="settingIcon" width="21" height="21"
+        /></span>
+        <span
+          v-else
+          class="skeleton skeleton-text"
+          style="width: 120px; height: 1.3em"
+        ></span>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import settingIcon from '/Image/linkicon.txt?raw'
+import settingIcon from "/Image/linkicon.txt?raw";
 import { ref, onMounted, watch, computed, onUnmounted } from "vue";
 import { useRoute } from "vue-router";
 import VideoList from "@/components/Playlist.vue";
 import { apiRequest } from "@/services/requestManager";
-import subscriptionManager from '@/utils/subscriptionManager';
+import subscriptionManager from "@/utils/subscriptionManager";
 
 const props = defineProps({ channelId: String });
 
@@ -227,29 +419,41 @@ async function toggleSubscribeOnChannel() {
     if (subscriptionManager.isSubscribed(id)) {
       subscriptionManager.removeSubscription(id);
       subscribed.value = false;
-      try { window.dispatchEvent(new CustomEvent('subscriptions-changed')); } catch(e){}
+      try {
+        window.dispatchEvent(new CustomEvent("subscriptions-changed"));
+      } catch (e) {}
     } else {
       // Optimistically add (use avatar URL if present so the icon displays immediately)
       const initialIcon = channel.value?.avatar || null;
-      subscriptionManager.addSubscription({ id, name: channel.value?.title || '', icon: initialIcon });
+      subscriptionManager.addSubscription({
+        id,
+        name: channel.value?.title || "",
+        icon: initialIcon,
+      });
       subscribed.value = true;
-      try { window.dispatchEvent(new CustomEvent('subscriptions-changed')); } catch(e){}
+      try {
+        window.dispatchEvent(new CustomEvent("subscriptions-changed"));
+      } catch (e) {}
       // Fetch icon async
       (async () => {
         try {
-          const icon = channel.value?.avatar ? await subscriptionManager.fetchImageAsBase64(channel.value.avatar) : null;
+          const icon = channel.value?.avatar
+            ? await subscriptionManager.fetchImageAsBase64(channel.value.avatar)
+            : null;
           if (icon) {
             subscriptionManager.updateSubscription(id, { icon });
           } else if (channel.value?.avatar) {
-            subscriptionManager.updateSubscription(id, { icon: channel.value.avatar });
+            subscriptionManager.updateSubscription(id, {
+              icon: channel.value.avatar,
+            });
           }
         } catch (e) {
-          console.warn('icon fetch failed', e);
+          console.warn("icon fetch failed", e);
         }
       })();
     }
   } catch (e) {
-    console.error('toggleSubscribeOnChannel error', e);
+    console.error("toggleSubscribeOnChannel error", e);
   }
 }
 
@@ -298,9 +502,9 @@ function reloadChannel() {
 onMounted(() => {
   fetchChannelInfo(effectiveId.value);
   updateSubscribed();
-  window.addEventListener('subscriptions-changed', updateSubscribed);
-  window.addEventListener('storage', (e) => {
-    if (e.key === 'subscriptions_v1') updateSubscribed();
+  window.addEventListener("subscriptions-changed", updateSubscribed);
+  window.addEventListener("storage", (e) => {
+    if (e.key === "subscriptions_v1") updateSubscribed();
   });
 });
 
@@ -317,7 +521,7 @@ watch(
 );
 
 onUnmounted(() => {
-  window.removeEventListener('subscriptions-changed', updateSubscribed);
+  window.removeEventListener("subscriptions-changed", updateSubscribed);
 });
 
 // channel変更時にタイトル更新
@@ -331,13 +535,13 @@ watch(
 </script>
 
 <style scoped>
-.page-end-tab{
+.page-end-tab {
   margin: 0 auto;
   text-decoration: underline;
   font-size: 21px;
 }
 
-.subscribe-btn{
+.subscribe-btn {
   padding: 6px 10px;
   border-radius: 6px;
   border: 1px solid var(--border-color);
@@ -345,10 +549,10 @@ watch(
   color: var(--text-primary);
   cursor: pointer;
 }
-.subscribe-btn.subscribed{
+.subscribe-btn.subscribed {
   background: var(--accent-color);
   color: var(--on-accent);
-  border-color: rgba(0,0,0,0.05);
+  border-color: rgba(0, 0, 0, 0.05);
 }
 .page-end {
   text-align: center;
@@ -359,7 +563,7 @@ watch(
   margin-block-end: 0.1em;
   margin-top: 1;
   line-height: 1.3;
-  max-height: calc(1.3em * 2); 
+  max-height: calc(1.3em * 2);
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -401,14 +605,14 @@ watch(
 .playlist-video-link-to::before {
   content: "";
   display: inline-block;
-  width: 20px; 
+  width: 20px;
 }
 
 .playlist-video-link-to:hover {
   text-decoration: underline;
   text-decoration-color: var(--text-primary);
   text-decoration-thickness: 2px;
-  text-underline-offset: 3px; 
+  text-underline-offset: 3px;
 }
 
 .playlist-items-scroll {

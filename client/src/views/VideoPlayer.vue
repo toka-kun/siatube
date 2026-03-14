@@ -2,12 +2,24 @@
   <div class="page-container yt-watch-page">
     <div class="main-content" v-if="video">
       <div class="video-wrapper">
-        <StreamPlayer :videoId="videoId" :streamType="resolvedStreamType" @ended="onPlayerEnded" @play-autoplay-candidate="onPlayAutoplayCandidate" @autoplay-no-suitable-video="onAutoplayNoSuitableVideo" />
+        <StreamPlayer
+          :videoId="videoId"
+          :streamType="resolvedStreamType"
+          @ended="onPlayerEnded"
+          @play-autoplay-candidate="onPlayAutoplayCandidate"
+          @autoplay-no-suitable-video="onAutoplayNoSuitableVideo"
+        />
       </div>
 
       <h1 class="video-title" ref="videoTitle">{{ title }}</h1>
       <div class="video-info channel-info">
-          <div class="channel-icon-link" @click.stop="onChannelClick" @keydown.enter="onChannelClick" tabindex="0" role="button">
+        <div
+          class="channel-icon-link"
+          @click.stop="onChannelClick"
+          @keydown.enter="onChannelClick"
+          tabindex="0"
+          role="button"
+        >
           <img
             :src="authorThumbnailUrl"
             alt="チャンネルアイコン"
@@ -16,10 +28,51 @@
           />
         </div>
         <div class="channel-text">
-          <div class="channel-name" @click.stop="onChannelClick" @keydown.enter="onChannelClick" tabindex="0" role="button">
+          <div
+            class="channel-name"
+            @click.stop="onChannelClick"
+            @keydown.enter="onChannelClick"
+            tabindex="0"
+            role="button"
+          >
             {{ authorName }}
-            <span style="margin-left: 5px;" v-if="authorBadge === 'AUDIO_BADGE'"><svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg" display="inherit"> <g class="layer"> <title>Layer 1</title>  <path d="m6.6,1.04l-0.62,0.62l-0.87,0a3.41,3.43 0 0 0 -3.41,3.43l0,0.87l-0.62,0.62a3.41,3.43 0 0 0 0,4.85l0.62,0.62l0,0.87a3.41,3.43 0 0 0 3.41,3.43l0.87,0l0.62,0.62a3.41,3.43 0 0 0 4.82,0l0.62,-0.62l0.87,0a3.41,3.43 0 0 0 3.41,-3.43l0,-0.87l0.62,-0.62a3.41,3.43 0 0 0 0,-4.85l-0.62,-0.62l0,-0.87a3.41,3.43 0 0 0 -3.41,-3.43l-0.87,0l-0.62,-0.62a3.41,3.43 0 0 0 -4.82,0zm6.28,5.42a0.41,0.41 0 0 1 0.19,0.35l0,1.42a0.21,0.21 0 0 1 -0.32,0.18l-2.12,-1.28l0,3.72a2.23,2.25 0 1 1 -1.62,-2.16l0,-3.85a0.41,0.41 0 0 1 0.62,-0.35l3.25,1.98z" id="svg_1"/> </g></svg>  </span> 
-            <span style="margin-left: 5px;" v-else-if="authorBadge === 'CHECK_CIRCLE_THICK'"><svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg" display="inherit"> <g class="layer">  <title>Layer 1</title>  <path d="m9.04,0.16c-4.94,0 -8.93,3.98 -8.93,8.91s4,8.91 8.93,8.91s8.93,-3.99 8.93,-8.91s-4,-8.91 -8.93,-8.91zm4.64,5.9a0.81,0.81 0 0 1 0,1.15l-6.26,6.23l-3.01,-3a0.81,0.81 0 1 1 1.15,-1.15l1.86,1.86l5.11,-5.1a0.81,0.81 0 0 1 1.15,0z" id="svg_1"/> </g></svg></span>
+            <span style="margin-left: 5px" v-if="authorBadge === 'AUDIO_BADGE'"
+              ><svg
+                width="18"
+                height="18"
+                xmlns="http://www.w3.org/2000/svg"
+                xmlns:svg="http://www.w3.org/2000/svg"
+                display="inherit"
+              >
+                <g class="layer">
+                  <title>認証済み音楽チャンネル</title>
+                  <path
+                    fill="var(--svg-color)"
+                    d="m6.6,1.04l-0.62,0.62l-0.87,0a3.41,3.43 0 0 0 -3.41,3.43l0,0.87l-0.62,0.62a3.41,3.43 0 0 0 0,4.85l0.62,0.62l0,0.87a3.41,3.43 0 0 0 3.41,3.43l0.87,0l0.62,0.62a3.41,3.43 0 0 0 4.82,0l0.62,-0.62l0.87,0a3.41,3.43 0 0 0 3.41,-3.43l0,-0.87l0.62,-0.62a3.41,3.43 0 0 0 0,-4.85l-0.62,-0.62l0,-0.87a3.41,3.43 0 0 0 -3.41,-3.43l-0.87,0l-0.62,-0.62a3.41,3.43 0 0 0 -4.82,0zm6.28,5.42a0.41,0.41 0 0 1 0.19,0.35l0,1.42a0.21,0.21 0 0 1 -0.32,0.18l-2.12,-1.28l0,3.72a2.23,2.25 0 1 1 -1.62,-2.16l0,-3.85a0.41,0.41 0 0 1 0.62,-0.35l3.25,1.98z"
+                    id="svg_1"
+                  />
+                </g>
+              </svg>
+            </span>
+            <span
+              style="margin-left: 5px"
+              v-else-if="authorBadge === 'CHECK_CIRCLE_THICK'"
+              ><svg
+                width="18"
+                height="18"
+                xmlns="http://www.w3.org/2000/svg"
+                xmlns:svg="http://www.w3.org/2000/svg"
+                display="inherit"
+              >
+                <g class="layer">
+                  <title>認証済み</title>
+                  <path
+                    fill="var(--svg-color)"
+                    d="m9.04,0.16c-4.94,0 -8.93,3.98 -8.93,8.91s4,8.91 8.93,8.91s8.93,-3.99 8.93,-8.91s-4,-8.91 -8.93,-8.91zm4.64,5.9a0.81,0.81 0 0 1 0,1.15l-6.26,6.23l-3.01,-3a0.81,0.81 0 1 1 1.15,-1.15l1.86,1.86l5.11,-5.1a0.81,0.81 0 0 1 1.15,0z"
+                    id="svg_1"
+                  />
+                </g></svg
+            ></span>
           </div>
           <p class="subscriber-count">{{ subscriberCount }}</p>
         </div>
@@ -31,7 +84,7 @@
             @click.stop="toggleSubscribe"
             :title="subscribedLocal ? '登録解除' : '登録'"
           >
-            {{ subscribedLocal ? '登録解除' : '登録' }}
+            {{ subscribedLocal ? "登録解除" : "登録" }}
           </button>
 
           <StreamTypeDropdown
@@ -50,17 +103,341 @@
         "
       >
         <div class="video-meta">
-          <span>{{ viewCount.replace(/\s+/g, '') }}</span>
+          <span>{{ viewCount.replace(/\s+/g, "") }}</span>
           <span>・{{ relativeDate }}</span>
-          <span v-if="extended_title && extended_title.trim() !== ''" class="extended_title">{{ extended_title }}</span>
-          <div style="padding-top: 10px; display: flex; align-items:center; gap:8px;">
-            <div id=mainvideo-likeCount>
-              <svg style="padding-top: 2px; padding-right: 4px;" width="20" height="20" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" transform="translate3d(0px, 0px, 0px)"> <defs>  <clipPath id="__lottie_element_402">   <rect height="48" id="svg_1" width="48" x="0" y="0"/>  </clipPath>  <clipPath id="__lottie_element_419">   <path d="m-37.97,-32.54l480,0l0,480l-480,0l0,-480z" id="svg_2"/>  </clipPath>  <clipPath id="__lottie_element_429">   <path d="m-37.97,-32.54l480,0l0,480l-480,0l0,-480z" id="svg_3"/>  </clipPath>  <clipPath id="__lottie_element_439">   <path d="m-37.97,-32.54l480,0l0,480l-480,0l0,-480z" id="svg_4"/>  </clipPath>  <clipPath id="__lottie_element_449">   <path d="m-37.97,-32.54l480,0l0,480l-480,0l0,-480z" id="svg_5"/>  </clipPath>  <clipPath id="__lottie_element_459">   <path d="m-37.97,-32.54l480,0l0,480l-480,0l0,-480z" id="svg_6"/>  </clipPath> </defs> <g class="layer">  <title>レイヤー1</title>  <g clip-path="url(#__lottie_element_402)" id="svg_7">   <g clip-path="url(#__lottie_element_459)" display="none" id="svg_8" transform="matrix(0.0567383 -0.166685 0.174622 0.0541596 -11.6766 76.011)">    <g display="block" id="svg_9" transform="matrix(0.750315 0.66108 -0.66108 0.750315 286.276 187.478)">     <path d="m-51.09,-298.22c0,0 0,-0.62 0,-0.62" fill-opacity="0" id="svg_10" stroke="var(--normal-color)" stroke-linecap="round" stroke-linejoin="round" stroke-width="0"/>     <g id="svg_11" transform="matrix(1 0 0 1.2 0 0)"/>    </g>    <g display="block" id="svg_12" transform="matrix(0.994522 -0.104524 0.104524 0.994522 231.638 160.438)">     <path d="m97.01,-278.06c0,0 0,-0.63 0,-0.63" fill-opacity="0" id="svg_13" stroke="var(--normal-color)" stroke-linecap="round" stroke-linejoin="round" stroke-width="0"/>     <g id="svg_14" transform="matrix(1 0 0 1.2 0 0)"/>    </g>   </g>   <g clip-path="url(#__lottie_element_449)" display="none" id="svg_15" transform="matrix(-0.148543 -0.103018 0.107923 -0.141791 53.5988 107.759)">    <g display="block" id="svg_16" transform="matrix(0.750315 0.66108 -0.66108 0.750315 286.276 187.478)">     <path d="m154.29,-223.23c0,0 0,-0.62 0,-0.62" fill-opacity="0" id="svg_17" stroke="var(--normal-color)" stroke-linecap="round" stroke-linejoin="round" stroke-width="0"/>     <g id="svg_18" transform="matrix(1 0 0 1.2 0 0)"/>    </g>    <g display="block" id="svg_19" transform="matrix(0.994522 -0.104524 0.104524 0.994522 231.638 160.438)">     <path d="m180.9,-76.15c0,0 0,-0.63 0,-0.63" fill-opacity="0" id="svg_20" stroke="var(--normal-color)" stroke-linecap="round" stroke-linejoin="round" stroke-width="0"/>     <g id="svg_21" transform="matrix(1 0 0 1.2 0 0)"/>    </g>   </g>   <g clip-path="url(#__lottie_element_439)" display="none" id="svg_22" transform="matrix(-0.148543 0.103018 -0.107923 -0.141791 105.402 58.3104)">    <g display="block" id="svg_23" transform="matrix(0.750315 0.66108 -0.66108 0.750315 286.276 187.478)">     <path d="m146.45,-4.73c0,0 0,-0.62 0,-0.62" fill-opacity="0" id="svg_24" stroke="var(--normal-color)" stroke-linecap="round" stroke-linejoin="round" stroke-width="0"/>     <g id="svg_25" transform="matrix(1 0 0 1.2 0 0)"/>    </g>    <g display="block" id="svg_26" transform="matrix(0.994522 -0.104524 0.104524 0.994522 231.638 160.438)">     <path d="m14.8,66.03c0,0 0,-0.63 0,-0.63" fill-opacity="0" id="svg_27" stroke="var(--normal-color)" stroke-linecap="round" stroke-linejoin="round" stroke-width="0"/>     <g id="svg_28" transform="matrix(1 0 0 1.2 0 0)"/>    </g>   </g>   <g clip-path="url(#__lottie_element_429)" display="none" id="svg_29" transform="matrix(0.0567383 0.166685 -0.174622 0.0541596 72.1421 -3.99831)">    <g display="block" id="svg_30" transform="matrix(0.750315 0.66108 -0.66108 0.750315 286.276 187.478)">     <path d="m-63.78,55.33c0,0 0,-0.62 0,-0.62" fill-opacity="0" id="svg_31" stroke="var(--normal-color)" stroke-linecap="round" stroke-linejoin="round" stroke-width="0"/>     <g id="svg_32" transform="matrix(1 0 0 1.2 0 0)"/>    </g>    <g display="block" id="svg_33" transform="matrix(0.994522 -0.104524 0.104524 0.994522 231.638 160.438)">     <path d="m-171.76,-48.01c0,0 0,-0.63 0,-0.63" fill-opacity="0" id="svg_34" stroke="var(--normal-color)" stroke-linecap="round" stroke-linejoin="round" stroke-width="0"/>     <g id="svg_35" transform="matrix(1 0 0 1.2 0 0)"/>    </g>   </g>   <g clip-path="url(#__lottie_element_419)" display="none" id="svg_36" transform="matrix(0.183609 0 0 0.175264 -0.216196 6.94126)">    <g display="block" id="svg_37" transform="matrix(0.750315 0.66108 -0.66108 0.750315 286.276 187.478)">     <path d="m-185.88,-126.05c0,0 0,-0.62 0,-0.62" fill-opacity="0" id="svg_38" stroke="var(--normal-color)" stroke-linecap="round" stroke-linejoin="round" stroke-width="0"/>     <g id="svg_39" transform="matrix(1 0 0 1.2 0 0)"/>    </g>    <g display="block" id="svg_40" transform="matrix(0.994522 -0.104524 0.104524 0.994522 231.638 160.438)">     <path d="m-120.94,-260.67c0,0 0,-0.63 0,-0.63" fill-opacity="0" id="svg_41" stroke="var(--normal-color)" stroke-linecap="round" stroke-linejoin="round" stroke-width="0"/>     <g id="svg_42" transform="matrix(1 0 0 1.2 0 0)"/>    </g>   </g>   <g display="none" id="svg_43" transform="matrix(0.183609 0 0 0.175264 43.85 49.0047)"/>   <g display="none" id="svg_44" transform="matrix(1.83609 0 0 1.75264 39.9942 42.345)">    <path d="m-13.5,-16.04c1.79,0 3.25,1.46 3.25,3.25c0,1.79 -1.46,3.25 -3.25,3.25c-1.79,0 -3.25,-1.46 -3.25,-3.25c0,-1.79 1.46,-3.25 3.25,-3.25zm0.8,-6.74c1.79,0.44 2.78,2.29 2.35,4.06c-0.19,0.76 -0.39,1.52 -0.71,2.47c-0.31,0.96 1.35,1.32 0.19,3.91c-0.88,1.98 -6.38,0.28 -5.36,-2.62c0.89,-2.51 1.71,-4.88 2.56,-7.3c0.15,-0.43 0.56,-0.63 0.97,-0.52z" fill="var(--normal-color)" id="svg_45"/>   </g>   <g display="none" id="svg_46" transform="matrix(1.83609 0 0 1.75264 43.85 41.9945)">    <path d="m-13.71,-15.25c0.48,0.44 0.87,0.45 1.54,0.45c0,0 5.29,0 5.29,0c0.85,0 1.62,0.48 2,1.24c0,0 0.18,0.36 0.18,0.36c0.4,0.8 0.14,1.78 -0.6,2.28c-0.13,0.08 -0.2,0.22 -0.2,0.37c0,0 0,0.07 0,0.07c0,0.12 0.04,0.25 0.12,0.35c0.77,1.02 0.58,2.47 -0.42,3.27c0,0 -0.49,0.4 -0.49,0.4c-0.13,0.1 -0.18,0.27 -0.13,0.42c0,0 0.07,0.2 0.07,0.2c0.22,0.66 0.1,1.38 -0.31,1.93c-0.53,0.7 -1.36,1.12 -2.24,1.12c0,0 -3.91,-0.01 -3.91,-0.01c-2.09,0 -4.14,-0.54 -5.95,-1.58c0,0 -0.28,-0.15 -0.28,-0.15c-0.3,-0.18 -0.64,-0.27 -0.99,-0.27c0,0 -2.47,0 -2.47,0c-0.55,0 -1,-0.45 -1,-1c0,0 0,-5.99 0,-5.99c0,-0.56 0.45,-1.01 1,-1c0,0 2.79,0 2.79,0c0.43,0 0.8,-0.27 0.95,-0.67c0,0 0.2,-0.16 0.36,-0.6c0.6,-1.68 4.04,-1.95 4.69,-1.19z" fill="var(--normal-color)" id="svg_47"/>   </g>   <g display="none" id="svg_48" transform="matrix(0.547972 0.0549741 -0.0575915 0.523066 49.7345 48.9309)">    <path d="m-59.33,-53.69c3,-0.13 1.79,1.3 1.18,1.73c3.79,0.17 5.52,0.57 5.5,1.53c-0.09,3.7 -0.43,6.83 -2.85,9.66c-6.53,1.38 -11.75,-2.2 -14.5,-2.02c-0.05,-1.73 -0.24,-4.32 0.13,-6.58c3.91,-0.29 6.93,-4.18 10.54,-4.32z" fill="var(--normal-color)" id="svg_49"/>   </g>   <g display="block" id="svg_50" transform="matrix(0.959954 0 0 0.909324 22.9493 21.8543)">    <path d="m-16.06,-22.78c0.16,-0.46 0.63,-0.74 1.11,-0.66c0,0 1.04,0.17 1.04,0.17c2.25,0.38 3.73,2.55 3.25,4.78c0,0 -0.62,2.91 -0.62,2.91c0,0 4.06,0 4.06,0c1.72,0 3.21,1.19 3.58,2.87c0.23,1.03 -0.01,2.13 -0.64,2.98c0,0 0.02,0.09 0.02,0.09c0.3,1.28 -0.09,2.63 -1.02,3.56c0,0 0,0.04 0,0.04c0,0 -0.01,0.23 -0.01,0.23c-0.02,0.22 -0.06,0.45 -0.13,0.66c0,0 -0.11,0.29 -0.11,0.29c-0.59,1.37 -1.94,2.28 -3.45,2.28c0,0 -3.61,0 -3.61,0c0,0 -0.39,-0.01 -0.39,-0.01c-1.83,-0.06 -3.61,-0.53 -5.23,-1.39c0,0 -0.34,-0.18 -0.34,-0.18c0,0 -0.27,-0.16 -0.27,-0.16c-0.26,-0.15 -0.56,-0.24 -0.86,-0.26c0,0 -0.13,0 -0.13,0c0,0 -1.97,0 -1.97,0c-0.83,0 -1.5,-0.67 -1.5,-1.5c0,0 0,-6 0,-6c0,-0.83 0.67,-1.5 1.5,-1.5c0,0 1.79,0 1.79,0c0,0 0.16,-0.01 0.16,-0.01c0.31,-0.05 0.57,-0.24 0.72,-0.52c0,0 0.06,-0.14 0.06,-0.14c0,0 2.99,-8.53 2.99,-8.53zm-1.1,9.19c-0.42,1.2 -1.55,2.01 -2.83,2.01c0,0 -1.29,0 -1.29,0c0,0 0,5 0,5c0,0 1.47,0 1.47,0c0.69,0 1.38,0.18 1.98,0.53c0,0 0.27,0.15 0.27,0.15c0,0 0.29,0.16 0.29,0.16c1.44,0.76 3.05,1.16 4.68,1.16c0,0 3.61,0 3.61,0c0.75,0 1.42,-0.48 1.66,-1.2c0,0 0.03,-0.13 0.03,-0.13c0.01,-0.04 0.01,-0.08 0.01,-0.13c0,0 0,-0.87 0,-0.87c0,0 0.59,-0.58 0.59,-0.58c0.38,-0.39 0.57,-0.93 0.52,-1.47c0,0 -0.04,-0.23 -0.04,-0.23c0,0 -0.02,-0.09 -0.02,-0.09c0,0 -0.21,-0.9 -0.21,-0.9c0,0 0.55,-0.74 0.55,-0.74c0.29,-0.39 0.4,-0.89 0.29,-1.36c-0.17,-0.76 -0.84,-1.3 -1.62,-1.3c0,0 -4.06,0 -4.06,0c-0.6,0 -1.18,-0.27 -1.56,-0.74c-0.38,-0.47 -0.52,-1.09 -0.4,-1.68c0,0 0.63,-2.9 0.63,-2.9c0.24,-1.12 -0.5,-2.21 -1.63,-2.4c0,0 -0.21,-0.03 -0.21,-0.03c0,0 -2.71,7.74 -2.71,7.74z" fill="var(--normal-color)" id="svg_51"/>   </g>  </g> </g></svg>
+          <span
+            v-if="extended_title && extended_title.trim() !== ''"
+            class="extended_title"
+            >{{ extended_title }}</span
+          >
+          <div
+            style="
+              padding-top: 10px;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+            "
+          >
+            <div id="mainvideo-likeCount">
+              <svg
+                style="padding-top: 2px; padding-right: 4px"
+                width="20"
+                height="20"
+                xmlns="http://www.w3.org/2000/svg"
+                xmlns:svg="http://www.w3.org/2000/svg"
+                preserveAspectRatio="xMidYMid meet"
+                transform="translate3d(0px, 0px, 0px)"
+              >
+                <defs>
+                  <clipPath id="__lottie_element_402">
+                    <rect height="48" id="svg_1" width="48" x="0" y="0" />
+                  </clipPath>
+                  <clipPath id="__lottie_element_419">
+                    <path
+                      d="m-37.97,-32.54l480,0l0,480l-480,0l0,-480z"
+                      id="svg_2"
+                    />
+                  </clipPath>
+                  <clipPath id="__lottie_element_429">
+                    <path
+                      d="m-37.97,-32.54l480,0l0,480l-480,0l0,-480z"
+                      id="svg_3"
+                    />
+                  </clipPath>
+                  <clipPath id="__lottie_element_439">
+                    <path
+                      d="m-37.97,-32.54l480,0l0,480l-480,0l0,-480z"
+                      id="svg_4"
+                    />
+                  </clipPath>
+                  <clipPath id="__lottie_element_449">
+                    <path
+                      d="m-37.97,-32.54l480,0l0,480l-480,0l0,-480z"
+                      id="svg_5"
+                    />
+                  </clipPath>
+                  <clipPath id="__lottie_element_459">
+                    <path
+                      d="m-37.97,-32.54l480,0l0,480l-480,0l0,-480z"
+                      id="svg_6"
+                    />
+                  </clipPath>
+                </defs>
+                <g class="layer">
+                  <title>レイヤー1</title>
+                  <g clip-path="url(#__lottie_element_402)" id="svg_7">
+                    <g
+                      clip-path="url(#__lottie_element_459)"
+                      display="none"
+                      id="svg_8"
+                      transform="matrix(0.0567383 -0.166685 0.174622 0.0541596 -11.6766 76.011)"
+                    >
+                      <g
+                        display="block"
+                        id="svg_9"
+                        transform="matrix(0.750315 0.66108 -0.66108 0.750315 286.276 187.478)"
+                      >
+                        <path
+                          d="m-51.09,-298.22c0,0 0,-0.62 0,-0.62"
+                          fill-opacity="0"
+                          id="svg_10"
+                          stroke="var(--normal-color)"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="0"
+                        />
+                        <g id="svg_11" transform="matrix(1 0 0 1.2 0 0)" />
+                      </g>
+                      <g
+                        display="block"
+                        id="svg_12"
+                        transform="matrix(0.994522 -0.104524 0.104524 0.994522 231.638 160.438)"
+                      >
+                        <path
+                          d="m97.01,-278.06c0,0 0,-0.63 0,-0.63"
+                          fill-opacity="0"
+                          id="svg_13"
+                          stroke="var(--normal-color)"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="0"
+                        />
+                        <g id="svg_14" transform="matrix(1 0 0 1.2 0 0)" />
+                      </g>
+                    </g>
+                    <g
+                      clip-path="url(#__lottie_element_449)"
+                      display="none"
+                      id="svg_15"
+                      transform="matrix(-0.148543 -0.103018 0.107923 -0.141791 53.5988 107.759)"
+                    >
+                      <g
+                        display="block"
+                        id="svg_16"
+                        transform="matrix(0.750315 0.66108 -0.66108 0.750315 286.276 187.478)"
+                      >
+                        <path
+                          d="m154.29,-223.23c0,0 0,-0.62 0,-0.62"
+                          fill-opacity="0"
+                          id="svg_17"
+                          stroke="var(--normal-color)"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="0"
+                        />
+                        <g id="svg_18" transform="matrix(1 0 0 1.2 0 0)" />
+                      </g>
+                      <g
+                        display="block"
+                        id="svg_19"
+                        transform="matrix(0.994522 -0.104524 0.104524 0.994522 231.638 160.438)"
+                      >
+                        <path
+                          d="m180.9,-76.15c0,0 0,-0.63 0,-0.63"
+                          fill-opacity="0"
+                          id="svg_20"
+                          stroke="var(--normal-color)"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="0"
+                        />
+                        <g id="svg_21" transform="matrix(1 0 0 1.2 0 0)" />
+                      </g>
+                    </g>
+                    <g
+                      clip-path="url(#__lottie_element_439)"
+                      display="none"
+                      id="svg_22"
+                      transform="matrix(-0.148543 0.103018 -0.107923 -0.141791 105.402 58.3104)"
+                    >
+                      <g
+                        display="block"
+                        id="svg_23"
+                        transform="matrix(0.750315 0.66108 -0.66108 0.750315 286.276 187.478)"
+                      >
+                        <path
+                          d="m146.45,-4.73c0,0 0,-0.62 0,-0.62"
+                          fill-opacity="0"
+                          id="svg_24"
+                          stroke="var(--normal-color)"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="0"
+                        />
+                        <g id="svg_25" transform="matrix(1 0 0 1.2 0 0)" />
+                      </g>
+                      <g
+                        display="block"
+                        id="svg_26"
+                        transform="matrix(0.994522 -0.104524 0.104524 0.994522 231.638 160.438)"
+                      >
+                        <path
+                          d="m14.8,66.03c0,0 0,-0.63 0,-0.63"
+                          fill-opacity="0"
+                          id="svg_27"
+                          stroke="var(--normal-color)"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="0"
+                        />
+                        <g id="svg_28" transform="matrix(1 0 0 1.2 0 0)" />
+                      </g>
+                    </g>
+                    <g
+                      clip-path="url(#__lottie_element_429)"
+                      display="none"
+                      id="svg_29"
+                      transform="matrix(0.0567383 0.166685 -0.174622 0.0541596 72.1421 -3.99831)"
+                    >
+                      <g
+                        display="block"
+                        id="svg_30"
+                        transform="matrix(0.750315 0.66108 -0.66108 0.750315 286.276 187.478)"
+                      >
+                        <path
+                          d="m-63.78,55.33c0,0 0,-0.62 0,-0.62"
+                          fill-opacity="0"
+                          id="svg_31"
+                          stroke="var(--normal-color)"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="0"
+                        />
+                        <g id="svg_32" transform="matrix(1 0 0 1.2 0 0)" />
+                      </g>
+                      <g
+                        display="block"
+                        id="svg_33"
+                        transform="matrix(0.994522 -0.104524 0.104524 0.994522 231.638 160.438)"
+                      >
+                        <path
+                          d="m-171.76,-48.01c0,0 0,-0.63 0,-0.63"
+                          fill-opacity="0"
+                          id="svg_34"
+                          stroke="var(--normal-color)"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="0"
+                        />
+                        <g id="svg_35" transform="matrix(1 0 0 1.2 0 0)" />
+                      </g>
+                    </g>
+                    <g
+                      clip-path="url(#__lottie_element_419)"
+                      display="none"
+                      id="svg_36"
+                      transform="matrix(0.183609 0 0 0.175264 -0.216196 6.94126)"
+                    >
+                      <g
+                        display="block"
+                        id="svg_37"
+                        transform="matrix(0.750315 0.66108 -0.66108 0.750315 286.276 187.478)"
+                      >
+                        <path
+                          d="m-185.88,-126.05c0,0 0,-0.62 0,-0.62"
+                          fill-opacity="0"
+                          id="svg_38"
+                          stroke="var(--normal-color)"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="0"
+                        />
+                        <g id="svg_39" transform="matrix(1 0 0 1.2 0 0)" />
+                      </g>
+                      <g
+                        display="block"
+                        id="svg_40"
+                        transform="matrix(0.994522 -0.104524 0.104524 0.994522 231.638 160.438)"
+                      >
+                        <path
+                          d="m-120.94,-260.67c0,0 0,-0.63 0,-0.63"
+                          fill-opacity="0"
+                          id="svg_41"
+                          stroke="var(--normal-color)"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="0"
+                        />
+                        <g id="svg_42" transform="matrix(1 0 0 1.2 0 0)" />
+                      </g>
+                    </g>
+                    <g
+                      display="none"
+                      id="svg_43"
+                      transform="matrix(0.183609 0 0 0.175264 43.85 49.0047)"
+                    />
+                    <g
+                      display="none"
+                      id="svg_44"
+                      transform="matrix(1.83609 0 0 1.75264 39.9942 42.345)"
+                    >
+                      <path
+                        d="m-13.5,-16.04c1.79,0 3.25,1.46 3.25,3.25c0,1.79 -1.46,3.25 -3.25,3.25c-1.79,0 -3.25,-1.46 -3.25,-3.25c0,-1.79 1.46,-3.25 3.25,-3.25zm0.8,-6.74c1.79,0.44 2.78,2.29 2.35,4.06c-0.19,0.76 -0.39,1.52 -0.71,2.47c-0.31,0.96 1.35,1.32 0.19,3.91c-0.88,1.98 -6.38,0.28 -5.36,-2.62c0.89,-2.51 1.71,-4.88 2.56,-7.3c0.15,-0.43 0.56,-0.63 0.97,-0.52z"
+                        fill="var(--normal-color)"
+                        id="svg_45"
+                      />
+                    </g>
+                    <g
+                      display="none"
+                      id="svg_46"
+                      transform="matrix(1.83609 0 0 1.75264 43.85 41.9945)"
+                    >
+                      <path
+                        d="m-13.71,-15.25c0.48,0.44 0.87,0.45 1.54,0.45c0,0 5.29,0 5.29,0c0.85,0 1.62,0.48 2,1.24c0,0 0.18,0.36 0.18,0.36c0.4,0.8 0.14,1.78 -0.6,2.28c-0.13,0.08 -0.2,0.22 -0.2,0.37c0,0 0,0.07 0,0.07c0,0.12 0.04,0.25 0.12,0.35c0.77,1.02 0.58,2.47 -0.42,3.27c0,0 -0.49,0.4 -0.49,0.4c-0.13,0.1 -0.18,0.27 -0.13,0.42c0,0 0.07,0.2 0.07,0.2c0.22,0.66 0.1,1.38 -0.31,1.93c-0.53,0.7 -1.36,1.12 -2.24,1.12c0,0 -3.91,-0.01 -3.91,-0.01c-2.09,0 -4.14,-0.54 -5.95,-1.58c0,0 -0.28,-0.15 -0.28,-0.15c-0.3,-0.18 -0.64,-0.27 -0.99,-0.27c0,0 -2.47,0 -2.47,0c-0.55,0 -1,-0.45 -1,-1c0,0 0,-5.99 0,-5.99c0,-0.56 0.45,-1.01 1,-1c0,0 2.79,0 2.79,0c0.43,0 0.8,-0.27 0.95,-0.67c0,0 0.2,-0.16 0.36,-0.6c0.6,-1.68 4.04,-1.95 4.69,-1.19z"
+                        fill="var(--normal-color)"
+                        id="svg_47"
+                      />
+                    </g>
+                    <g
+                      display="none"
+                      id="svg_48"
+                      transform="matrix(0.547972 0.0549741 -0.0575915 0.523066 49.7345 48.9309)"
+                    >
+                      <path
+                        d="m-59.33,-53.69c3,-0.13 1.79,1.3 1.18,1.73c3.79,0.17 5.52,0.57 5.5,1.53c-0.09,3.7 -0.43,6.83 -2.85,9.66c-6.53,1.38 -11.75,-2.2 -14.5,-2.02c-0.05,-1.73 -0.24,-4.32 0.13,-6.58c3.91,-0.29 6.93,-4.18 10.54,-4.32z"
+                        fill="var(--normal-color)"
+                        id="svg_49"
+                      />
+                    </g>
+                    <g
+                      display="block"
+                      id="svg_50"
+                      transform="matrix(0.959954 0 0 0.909324 22.9493 21.8543)"
+                    >
+                      <path
+                        d="m-16.06,-22.78c0.16,-0.46 0.63,-0.74 1.11,-0.66c0,0 1.04,0.17 1.04,0.17c2.25,0.38 3.73,2.55 3.25,4.78c0,0 -0.62,2.91 -0.62,2.91c0,0 4.06,0 4.06,0c1.72,0 3.21,1.19 3.58,2.87c0.23,1.03 -0.01,2.13 -0.64,2.98c0,0 0.02,0.09 0.02,0.09c0.3,1.28 -0.09,2.63 -1.02,3.56c0,0 0,0.04 0,0.04c0,0 -0.01,0.23 -0.01,0.23c-0.02,0.22 -0.06,0.45 -0.13,0.66c0,0 -0.11,0.29 -0.11,0.29c-0.59,1.37 -1.94,2.28 -3.45,2.28c0,0 -3.61,0 -3.61,0c0,0 -0.39,-0.01 -0.39,-0.01c-1.83,-0.06 -3.61,-0.53 -5.23,-1.39c0,0 -0.34,-0.18 -0.34,-0.18c0,0 -0.27,-0.16 -0.27,-0.16c-0.26,-0.15 -0.56,-0.24 -0.86,-0.26c0,0 -0.13,0 -0.13,0c0,0 -1.97,0 -1.97,0c-0.83,0 -1.5,-0.67 -1.5,-1.5c0,0 0,-6 0,-6c0,-0.83 0.67,-1.5 1.5,-1.5c0,0 1.79,0 1.79,0c0,0 0.16,-0.01 0.16,-0.01c0.31,-0.05 0.57,-0.24 0.72,-0.52c0,0 0.06,-0.14 0.06,-0.14c0,0 2.99,-8.53 2.99,-8.53zm-1.1,9.19c-0.42,1.2 -1.55,2.01 -2.83,2.01c0,0 -1.29,0 -1.29,0c0,0 0,5 0,5c0,0 1.47,0 1.47,0c0.69,0 1.38,0.18 1.98,0.53c0,0 0.27,0.15 0.27,0.15c0,0 0.29,0.16 0.29,0.16c1.44,0.76 3.05,1.16 4.68,1.16c0,0 3.61,0 3.61,0c0.75,0 1.42,-0.48 1.66,-1.2c0,0 0.03,-0.13 0.03,-0.13c0.01,-0.04 0.01,-0.08 0.01,-0.13c0,0 0,-0.87 0,-0.87c0,0 0.59,-0.58 0.59,-0.58c0.38,-0.39 0.57,-0.93 0.52,-1.47c0,0 -0.04,-0.23 -0.04,-0.23c0,0 -0.02,-0.09 -0.02,-0.09c0,0 -0.21,-0.9 -0.21,-0.9c0,0 0.55,-0.74 0.55,-0.74c0.29,-0.39 0.4,-0.89 0.29,-1.36c-0.17,-0.76 -0.84,-1.3 -1.62,-1.3c0,0 -4.06,0 -4.06,0c-0.6,0 -1.18,-0.27 -1.56,-0.74c-0.38,-0.47 -0.52,-1.09 -0.4,-1.68c0,0 0.63,-2.9 0.63,-2.9c0.24,-1.12 -0.5,-2.21 -1.63,-2.4c0,0 -0.21,-0.03 -0.21,-0.03c0,0 -2.71,7.74 -2.71,7.74z"
+                        fill="var(--normal-color)"
+                        id="svg_51"
+                      />
+                    </g>
+                  </g>
+                </g>
+              </svg>
               {{ likeCount }}
             </div>
             <StreamPlayer :videoId="videoId" :streamType="'3'" />
-            <button class="add-playlist-btn" @click.stop="openPlaylistModal" title="プレイリストに追加">
-              <svg style="padding-right: 3px;" width="20" height="20" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg" display="inherit"> <g class="layer">  <title>Layer 1</title>  <path d="m16.41,0.98l-12.69,0a1.81,1.79 0 0 0 -1.81,1.79l0,15.09c0,1.13 1.25,1.83 2.24,1.25l5.92,-3.5l5.92,3.5c0.99,0.58 2.24,-0.13 2.24,-1.25l0,-15.09a1.81,1.79 0 0 0 -1.81,-1.79zm-12.69,16.28l0,-14.5l12.69,0l0,14.5l-5.88,-3.47l-0.47,-0.28l-0.47,0.28l-5.88,3.47z" id="svg_1" fill="var(--normal-color)"/> </g></svg>
+            <button
+              class="add-playlist-btn"
+              @click.stop="openPlaylistModal"
+              title="プレイリストに追加"
+            >
+              <svg
+                style="padding-right: 3px"
+                width="20"
+                height="20"
+                xmlns="http://www.w3.org/2000/svg"
+                xmlns:svg="http://www.w3.org/2000/svg"
+                display="inherit"
+              >
+                <g class="layer">
+                  <title>Layer 1</title>
+                  <path
+                    d="m16.41,0.98l-12.69,0a1.81,1.79 0 0 0 -1.81,1.79l0,15.09c0,1.13 1.25,1.83 2.24,1.25l5.92,-3.5l5.92,3.5c0.99,0.58 2.24,-0.13 2.24,-1.25l0,-15.09a1.81,1.79 0 0 0 -1.81,-1.79zm-12.69,16.28l0,-14.5l12.69,0l0,14.5l-5.88,-3.47l-0.47,-0.28l-0.47,0.28l-5.88,3.47z"
+                    id="svg_1"
+                    fill="var(--normal-color)"
+                  />
+                </g>
+              </svg>
               プレイリスト
             </button>
           </div>
@@ -70,22 +447,42 @@
           :descriptionRun1="descriptionRun1"
           :formattedDescription="formattedDescription"
           :showFull="showFullDescription"
-          @toggle="(v) => { showFullDescription = v }"
+          @toggle="
+            (v) => {
+              showFullDescription = v;
+            }
+          "
         />
       </div>
       <Comment :videoId="videoId" />
     </div>
 
-    <RelatedList v-if="relatedVideos.length" :relatedVideos="relatedVideos" :playlistId="playlistId" :currentVideoId="videoId" :loadingMore="loadingMore" @load-more="loadMoreRelatedVideos" />
+    <RelatedList
+      v-if="relatedVideos.length"
+      :relatedVideos="relatedVideos"
+      :playlistId="playlistId"
+      :currentVideoId="videoId"
+      :loadingMore="loadingMore"
+      @load-more="loadMoreRelatedVideos"
+    />
     <div v-else-if="error" class="error-msg">
-      ⚠️ {{ error }}<br>
-      <button class="reload-btn" @click="reloadVideo">再取得</button>
+      ⚠️ {{ error }}<br />
+      <button class="reload-btn" @click="reloadVideo">再取得</button><br>カスタムエンドポイントを設定していない場合、設定からカスタムエンドポイントのを追加してください　＊1~3分で作れます
     </div>
-    <p v-else class="loading-msg">読み込み中...<br>読み込む速度を早くする方法。↓<br>右上の設定マークからカスタムエンドポイントのを追加してください　＊方法は簡単で1~3分で作れます。</p>
+    <p v-else class="loading-msg">読み込み中...</p>
 
     <!-- 自動再生フィルタ通知 -->
-    <AutoplayNotification v-if="showAutoplayNotification" :message="autoplayNotificationMessage" @close="showAutoplayNotification = false" />
-    <PlaylistModal v-if="showPlaylistModal" :video="video" @close="closePlaylistModal" @added="onPlaylistAdded" />
+    <AutoplayNotification
+      v-if="showAutoplayNotification"
+      :message="autoplayNotificationMessage"
+      @close="showAutoplayNotification = false"
+    />
+    <PlaylistModal
+      v-if="showPlaylistModal"
+      :video="video"
+      @close="closePlaylistModal"
+      @added="onPlaylistAdded"
+    />
 
     <!-- コラボレーター一覧ポップアップ -->
     <CollaboratorsPopup
@@ -99,7 +496,7 @@
 <script setup>
 import { computed } from "vue";
 import { useRoute } from "vue-router";
-import { ref } from 'vue';
+import { ref } from "vue";
 import PlaylistComponent from "@/components/Playlist.vue";
 import Comment from "@/components/Comment.vue";
 import StreamPlayer from "@/components/StreamPlayer.vue";
@@ -109,10 +506,10 @@ const route = useRoute();
 const videoId = computed(() => route.query.v);
 const playlistId = computed(() => route.query.list);
 
-const currentType = ref('1');
+const currentType = ref("1");
 
 function switchStream() {
-  currentType.value = '3';
+  currentType.value = "3";
 }
 </script>
 
@@ -181,7 +578,7 @@ export default {
     likeCount() {
       return this.video?.likes || "情報なし";
     },
-    extended_title(){
+    extended_title() {
       return this.video?.extended_superTitle || "";
     },
     subscriberCount() {
@@ -195,21 +592,34 @@ export default {
       if (!author) return "情報なし";
       const name = author.name || "情報なし";
       // コラボの場合は「、他Nチャンネル」を追加
-      if (author.collaborator && Array.isArray(author.collaborators) && author.collaborators.length > 1) {
+      if (
+        author.collaborator &&
+        Array.isArray(author.collaborators) &&
+        author.collaborators.length > 1
+      ) {
         const others = author.collaborators.length - 1;
         return `${name}、他${others}チャンネル`;
       }
       return name;
     },
     authorBadge() {
-      return this.video?.extended_badges?.[0]?.metadataBadgeRenderer?.icon?.iconType || "";
+      return (
+        this.video?.extended_badges?.[0]?.metadataBadgeRenderer?.icon
+          ?.iconType || ""
+      );
     },
     authorThumbnailUrl() {
       const author = this.video?.author;
       if (!author) return "情報なし";
       // コラボの場合、先頭のコラボレーターのサムネイルを優先
-      if (author.collaborator && Array.isArray(author.collaborators) && author.collaborators.length > 0) {
-        return author.collaborators[0].thumbnail || author.thumbnail || "情報なし";
+      if (
+        author.collaborator &&
+        Array.isArray(author.collaborators) &&
+        author.collaborators.length > 0
+      ) {
+        return (
+          author.collaborators[0].thumbnail || author.thumbnail || "情報なし"
+        );
       }
       return author.thumbnail || "情報なし";
     },
@@ -278,12 +688,12 @@ export default {
           };
         }
       });
-      
+
       if (mapped.length > 0) {
         console.log("First related video item:", mapped[0]);
         console.log("Raw API response first item:", feed[0]);
       }
-      
+
       return mapped;
     },
   },
@@ -313,25 +723,28 @@ export default {
       }
     },
     parseDurationFromBadge(badgeText) {
-      if (!badgeText || typeof badgeText !== 'string') return 0;
-      
+      if (!badgeText || typeof badgeText !== "string") return 0;
+
       badgeText = badgeText.trim();
       console.log(`Parsing badge: "${badgeText}"`);
-      
+
       const hhmmssMatch = badgeText.match(/^(\d+):(\d+):(\d+)$/);
       if (hhmmssMatch) {
-        const seconds = parseInt(hhmmssMatch[1]) * 3600 + parseInt(hhmmssMatch[2]) * 60 + parseInt(hhmmssMatch[3]);
+        const seconds =
+          parseInt(hhmmssMatch[1]) * 3600 +
+          parseInt(hhmmssMatch[2]) * 60 +
+          parseInt(hhmmssMatch[3]);
         console.log(`  HH:MM:SS matched: ${seconds}s`);
         return seconds;
       }
-      
+
       const mmssMatch = badgeText.match(/^(\d+):(\d+)$/);
       if (mmssMatch) {
         const seconds = parseInt(mmssMatch[1]) * 60 + parseInt(mmssMatch[2]);
         console.log(`  MM:SS matched: ${seconds}s`);
         return seconds;
       }
-      
+
       const japaneseMatch = badgeText.match(/^(\d+)分(?:(\d+)秒)?$/);
       if (japaneseMatch) {
         let seconds = parseInt(japaneseMatch[1]) * 60;
@@ -341,7 +754,7 @@ export default {
         console.log(`  Japanese format matched: ${seconds}s`);
         return seconds;
       }
-      
+
       console.log(`  No pattern matched`);
       return 0;
     },
@@ -349,49 +762,87 @@ export default {
     async toggleSubscribe() {
       try {
         const id = this.authorId;
-        console.debug('toggleSubscribe clicked', { id, subscribedBefore: subscriptionManager.isSubscribed(id) });
-        if (!id || id === '情報なし') return;
+        console.debug("toggleSubscribe clicked", {
+          id,
+          subscribedBefore: subscriptionManager.isSubscribed(id),
+        });
+        if (!id || id === "情報なし") return;
         if (subscriptionManager.isSubscribed(id)) {
           subscriptionManager.removeSubscription(id);
           this.subscribedLocal = false;
-          try { window.dispatchEvent(new CustomEvent('subscriptions-changed')); } catch(e){}
-          console.debug('after remove, subscriptions', subscriptionManager.getSubscriptions());
-          this.autoplayNotificationMessage = 'チャンネル登録を解除しました';
+          try {
+            window.dispatchEvent(new CustomEvent("subscriptions-changed"));
+          } catch (e) {}
+          console.debug(
+            "after remove, subscriptions",
+            subscriptionManager.getSubscriptions()
+          );
+          this.autoplayNotificationMessage = "チャンネル登録を解除しました";
           this.showAutoplayNotification = true;
           setTimeout(() => (this.showAutoplayNotification = false), 2000);
         } else {
-          const initialIcon = (this.authorThumbnailUrl && this.authorThumbnailUrl !== '情報なし') ? this.authorThumbnailUrl : null;
+          const initialIcon =
+            this.authorThumbnailUrl && this.authorThumbnailUrl !== "情報なし"
+              ? this.authorThumbnailUrl
+              : null;
           const authorObj = this.video?.author || {};
-          const subName = authorObj.name || (authorObj.collaborator && Array.isArray(authorObj.collaborators) && authorObj.collaborators[0]?.name) || this.authorName;
-          subscriptionManager.addSubscription({ id, name: subName, icon: initialIcon });
+          const subName =
+            authorObj.name ||
+            (authorObj.collaborator &&
+              Array.isArray(authorObj.collaborators) &&
+              authorObj.collaborators[0]?.name) ||
+            this.authorName;
+          subscriptionManager.addSubscription({
+            id,
+            name: subName,
+            icon: initialIcon,
+          });
           this.subscribedLocal = true;
-          try { window.dispatchEvent(new CustomEvent('subscriptions-changed')); } catch(e){}
-          console.debug('after add, subscriptions', subscriptionManager.getSubscriptions());
-          this.autoplayNotificationMessage = 'チャンネルを登録しました';
+          try {
+            window.dispatchEvent(new CustomEvent("subscriptions-changed"));
+          } catch (e) {}
+          console.debug(
+            "after add, subscriptions",
+            subscriptionManager.getSubscriptions()
+          );
+          this.autoplayNotificationMessage = "チャンネルを登録しました";
           this.showAutoplayNotification = true;
           setTimeout(() => (this.showAutoplayNotification = false), 2000);
 
           // Fetch icon asynchronously and update subscription when available
           (async () => {
             try {
-              const fetchedIcon = await subscriptionManager.fetchImageAsBase64(this.authorThumbnailUrl);
+              const fetchedIcon = await subscriptionManager.fetchImageAsBase64(
+                this.authorThumbnailUrl
+              );
               if (fetchedIcon) {
-                subscriptionManager.updateSubscription(id, { icon: fetchedIcon });
-              } else if (this.authorThumbnailUrl && this.authorThumbnailUrl !== '情報なし') {
+                subscriptionManager.updateSubscription(id, {
+                  icon: fetchedIcon,
+                });
+              } else if (
+                this.authorThumbnailUrl &&
+                this.authorThumbnailUrl !== "情報なし"
+              ) {
                 // If base64 fetch failed, fall back to original URL so image still shows
-                subscriptionManager.updateSubscription(id, { icon: this.authorThumbnailUrl });
+                subscriptionManager.updateSubscription(id, {
+                  icon: this.authorThumbnailUrl,
+                });
               }
             } catch (e) {
-              console.warn('icon fetch failed', e);
+              console.warn("icon fetch failed", e);
             }
           })();
         }
         // ensure we re-sync shortly after in case of timing issues
         setTimeout(() => {
-          try { this.subscribedLocal = subscriptionManager.isSubscribed(this.authorId); } catch (e) {}
+          try {
+            this.subscribedLocal = subscriptionManager.isSubscribed(
+              this.authorId
+            );
+          } catch (e) {}
         }, 50);
       } catch (e) {
-        console.error('toggleSubscribe error', e);
+        console.error("toggleSubscribe error", e);
       }
     },
     setCookieSafe(name, value, seconds) {
@@ -414,14 +865,30 @@ export default {
     onPlayerEnded() {
       try {
         // 既存のタイマーをクリア
-        try { if (this._autoplayTimer) { clearTimeout(this._autoplayTimer); this._autoplayTimer = null; } } catch (e) {}
-        try { if (this._autoplayDecisionTimer) { clearTimeout(this._autoplayDecisionTimer); this._autoplayDecisionTimer = null; } } catch (e) {}
+        try {
+          if (this._autoplayTimer) {
+            clearTimeout(this._autoplayTimer);
+            this._autoplayTimer = null;
+          }
+        } catch (e) {}
+        try {
+          if (this._autoplayDecisionTimer) {
+            clearTimeout(this._autoplayDecisionTimer);
+            this._autoplayDecisionTimer = null;
+          }
+        } catch (e) {}
 
         // 少し待って（他のイベントが到着するのを待つ）から遷移タイマーをセット
         this._autoplayDecisionTimer = setTimeout(() => {
           try {
             // 自動再生ロックがある場合はスケジュールを抑止
-            const lockRaw = (() => { try { return sessionStorage.getItem('yt_autoplay_lock'); } catch (e) { return null; } })();
+            const lockRaw = (() => {
+              try {
+                return sessionStorage.getItem("yt_autoplay_lock");
+              } catch (e) {
+                return null;
+              }
+            })();
             if (lockRaw) {
               try {
                 const lock = JSON.parse(lockRaw);
@@ -432,7 +899,9 @@ export default {
               } catch (e) {}
             }
 
-            const filterConfig = window.__autoplayDurationFilter || { enabled: false };
+            const filterConfig = window.__autoplayDurationFilter || {
+              enabled: false,
+            };
             if (filterConfig.enabled) {
               return;
             }
@@ -452,7 +921,7 @@ export default {
               }
             }, 3000);
           } catch (e) {
-            console.error('autoplay decision error', e);
+            console.error("autoplay decision error", e);
           }
         }, 300); // 300ms の短い待ち時間
       } catch (e) {
@@ -466,12 +935,22 @@ export default {
         // 自動遷移中の競合を防ぐためロックを設定（短時間）
         try {
           const lock = { target: id, expires: Date.now() + 5000 };
-          sessionStorage.setItem('yt_autoplay_lock', JSON.stringify(lock));
+          sessionStorage.setItem("yt_autoplay_lock", JSON.stringify(lock));
         } catch (e) {}
 
         // 決定タイマーや既存の自動遷移タイマーをクリアしてから遷移
-        try { if (this._autoplayDecisionTimer) { clearTimeout(this._autoplayDecisionTimer); this._autoplayDecisionTimer = null; } } catch (e) {}
-        try { if (this._autoplayTimer) { clearTimeout(this._autoplayTimer); this._autoplayTimer = null; } } catch (e) {}
+        try {
+          if (this._autoplayDecisionTimer) {
+            clearTimeout(this._autoplayDecisionTimer);
+            this._autoplayDecisionTimer = null;
+          }
+        } catch (e) {}
+        try {
+          if (this._autoplayTimer) {
+            clearTimeout(this._autoplayTimer);
+            this._autoplayTimer = null;
+          }
+        } catch (e) {}
 
         const query = { v: id };
         this.$router.push({ path: "/watch", query });
@@ -482,7 +961,10 @@ export default {
 
     onAutoplayNoSuitableVideo() {
       try {
-        const filterConfig = window.__autoplayDurationFilter || { enabled: false, minutes: 4 };
+        const filterConfig = window.__autoplayDurationFilter || {
+          enabled: false,
+          minutes: 4,
+        };
         this.autoplayNotificationMessage = `指定条件（${filterConfig.minutes}分以下）に合う関連動画がないため、自動再生をストップしました。`;
         this.showAutoplayNotification = true;
 
@@ -504,7 +986,7 @@ export default {
     onPlaylistAdded({ playlistId }) {
       // optional: show a brief notification
       try {
-        this.autoplayNotificationMessage = 'プレイリストに追加しました';
+        this.autoplayNotificationMessage = "プレイリストに追加しました";
         this.showAutoplayNotification = true;
         setTimeout(() => (this.showAutoplayNotification = false), 2000);
       } catch (e) {}
@@ -533,14 +1015,17 @@ export default {
         });
 
         this.video = data;
-        this.nextContinuationToken = data["Related-videos"]?.nextContinuationToken || null;
+        this.nextContinuationToken =
+          data["Related-videos"]?.nextContinuationToken || null;
         // Sync subscribed state immediately after we have the author id
         try {
-          this.subscribedLocal = subscriptionManager.isSubscribed(this.authorId);
+          this.subscribedLocal = subscriptionManager.isSubscribed(
+            this.authorId
+          );
         } catch (e) {
-          console.warn('subscribed sync error', e);
+          console.warn("subscribed sync error", e);
         }
-        
+
         // 履歴に保存（非同期で実行、エラーは無視）
         try {
           await addVideoToHistory({
@@ -552,10 +1037,14 @@ export default {
             thumbnail: data.thumbnail,
           });
         } catch (historyError) {
-          console.warn('Failed to save to history:', historyError);
+          console.warn("Failed to save to history:", historyError);
         }
-        
-        if (!data["Related-videos"] || !Array.isArray(data["Related-videos"].relatedVideos) || data["Related-videos"].relatedVideos.length === 0) {
+
+        if (
+          !data["Related-videos"] ||
+          !Array.isArray(data["Related-videos"].relatedVideos) ||
+          data["Related-videos"].relatedVideos.length === 0
+        ) {
           this.error = "関連動画が見つかりませんでした。";
         }
         // Reset popup state when new video loads
@@ -607,15 +1096,23 @@ export default {
         const data = await apiRequest({
           // Use raw query formatting required:
           // video=動画ID==p==token==i==トークン==p==depth==i==2
-          params: { __rawQuery: `video=${this.videoId}==p==token==i==${this.nextContinuationToken}==p==depth==i==2` },
+          params: {
+            __rawQuery: `video=${this.videoId}==p==token==i==${this.nextContinuationToken}==p==depth==i==2`,
+          },
           method: "GET",
           retries: 3,
           timeout: 15000,
         });
-        if (data["Related-videos"] && Array.isArray(data["Related-videos"].relatedVideos)) {
+        if (
+          data["Related-videos"] &&
+          Array.isArray(data["Related-videos"].relatedVideos)
+        ) {
           // Append new related videos
-          this.video["Related-videos"].relatedVideos.push(...data["Related-videos"].relatedVideos);
-          this.nextContinuationToken = data["Related-videos"].nextContinuationToken || null;
+          this.video["Related-videos"].relatedVideos.push(
+            ...data["Related-videos"].relatedVideos
+          );
+          this.nextContinuationToken =
+            data["Related-videos"].nextContinuationToken || null;
         }
       } catch (err) {
         console.error("loadMoreRelatedVideos error:", err);
@@ -637,49 +1134,68 @@ export default {
       try {
         // Update local subscribed flag from storage so UI keeps consistent
         const val = subscriptionManager.isSubscribed(this.authorId);
-        console.debug('subscriptions-changed received on watch page', { id: this.authorId, subscribed: val });
+        console.debug("subscriptions-changed received on watch page", {
+          id: this.authorId,
+          subscribed: val,
+        });
         this.subscribedLocal = val;
-      } catch (e) { console.warn('onSubscriptionsChanged error', e); }
+      } catch (e) {
+        console.warn("onSubscriptionsChanged error", e);
+      }
     },
 
     onChannelClick(event) {
       try {
         const author = this.video?.author;
-        if (author && author.collaborator && Array.isArray(author.collaborators) && author.collaborators.length > 0) {
+        if (
+          author &&
+          author.collaborator &&
+          Array.isArray(author.collaborators) &&
+          author.collaborators.length > 0
+        ) {
           // show popup instead of navigate
           this.showCollaboratorsPopup = true;
           return;
         }
-        if (!this.authorId || this.authorId === '情報なし') return;
+        if (!this.authorId || this.authorId === "情報なし") return;
         this.$router.push({ path: `/channel/${this.authorId}` });
       } catch (e) {
-        console.error('onChannelClick error', e);
+        console.error("onChannelClick error", e);
       }
     },
   },
   mounted() {
     document.addEventListener("click", this.handleClickOutside);
     document.addEventListener("keydown", this.handleEscape);
-    window.addEventListener('subscriptions-changed', this.onSubscriptionsChanged);
+    window.addEventListener(
+      "subscriptions-changed",
+      this.onSubscriptionsChanged
+    );
 
     // initialize local subscribed state
     this.subscribedLocal = subscriptionManager.isSubscribed(this.authorId);
 
     // watch for storage changes from other tabs
     this._storageHandler = (e) => {
-      if (e.key === 'subscriptions_v1') {
+      if (e.key === "subscriptions_v1") {
         const val = subscriptionManager.isSubscribed(this.authorId);
-        console.debug('storage event on watch page', { key: e.key, subscribed: val });
+        console.debug("storage event on watch page", {
+          key: e.key,
+          subscribed: val,
+        });
         this.subscribedLocal = val;
       }
     };
-    window.addEventListener('storage', this._storageHandler);
+    window.addEventListener("storage", this._storageHandler);
   },
   beforeUnmount() {
     document.removeEventListener("click", this.handleClickOutside);
     document.removeEventListener("keydown", this.handleEscape);
-    window.removeEventListener('subscriptions-changed', this.onSubscriptionsChanged);
-    window.removeEventListener('storage', this._storageHandler);
+    window.removeEventListener(
+      "subscriptions-changed",
+      this.onSubscriptionsChanged
+    );
+    window.removeEventListener("storage", this._storageHandler);
     if (this._autoplayTimer) {
       clearTimeout(this._autoplayTimer);
       this._autoplayTimer = null;
@@ -703,11 +1219,10 @@ export default {
     },
   },
 };
-
 </script>
 
 <style scoped>
-.extended_title{
+.extended_title {
   margin-left: 10px;
   color: var(--text-secondary);
 }
@@ -722,14 +1237,14 @@ export default {
 }
 
 #mainvideo-likeCount {
-    font-size: 14px;
-    padding: 4px 11px;
-    background: var(--download-button);
-    color: var(--text-primary);
-    border: none;
-    border-radius: 30px;
-    cursor: pointer;
-    display: flex;
+  font-size: 14px;
+  padding: 4px 11px;
+  background: var(--download-button);
+  color: var(--text-primary);
+  border: none;
+  border-radius: 30px;
+  cursor: pointer;
+  display: flex;
 }
 
 .dropdown-ending {
@@ -763,7 +1278,7 @@ export default {
   white-space: nowrap;
 }
 
-.re-actername{
+.re-actername {
   margin-bottom: 3px;
   font-size: 0.8rem;
 }
@@ -822,7 +1337,7 @@ p {
   gap: 8px;
 }
 
-.subscribe-btn{
+.subscribe-btn {
   font-size: 0.9rem;
   padding: 0.5rem 1rem;
   border-radius: 6px;
@@ -831,10 +1346,10 @@ p {
   color: var(--text-primary);
   cursor: pointer;
 }
-.subscribe-btn.subscribed{
+.subscribe-btn.subscribed {
   background: var(--accent-color);
   color: var(--on-accent);
-  border-color: rgba(0,0,0,0.05);
+  border-color: rgba(0, 0, 0, 0.05);
 }
 
 .page-link {
@@ -866,7 +1381,7 @@ p {
 
 .channel-name {
   display: inline-flex;
-  align-items: center; 
+  align-items: center;
   font-weight: 500;
   font-size: 1.1rem;
   color: var(--text-primary);
@@ -900,7 +1415,7 @@ p {
   line-height: 1.5;
   margin-top: 12px;
   margin-bottom: 15px;
-  white-space: pre-wrap; 
+  white-space: pre-wrap;
   word-break: break-word;
 }
 .description-preview {

@@ -1,12 +1,83 @@
 export function setupSyncPlayback(video, audio, sources, selectedQuality, diffText, selectedPlaybackRate) {
   if (!video || !audio) return;
 
-  // Safari判定
-  function isSafari() {
-    const ua = navigator.userAgent;
-    return /Safari/.test(ua) && !/Chrome/.test(ua) && (/iPhone|iPad|Macintosh/.test(ua));
+  // Safari/WebKit判定（iOS系は全ブラウザでWebKitのためSafari扱い）
+  function isSafariLike() {
+    const ua = navigator.userAgent || "";
+    const isIOS = /iPhone|iPad|iPod/.test(ua);
+    if (isIOS) return true;
+    const isMac = /Macintosh/.test(ua);
+    if (!isMac) return false;
+    return /Safari/.test(ua) && !/(Chrome|Chromium|Edg|OPR|Brave|Vivaldi)/.test(ua);
   }
-  const safariMode = isSafari();
+  const safariMode = isSafariLike();
+
+  function normalizeSources(v) {
+    if (!v) return [];
+    if (Array.isArray(v.sources) && v.sources.length > 0) {
+      return preferH264First(v.sources
+        .map((s) => ({
+          url: typeof s === "string" ? s : (s?.url || ""),
+          mimeType: typeof s === "string" ? "" : (s?.mimeType || ""),
+        }))
+        .filter((s) => s.url));
+    }
+    if (typeof v === "string") return preferH264First([{ url: v, mimeType: "" }]);
+    if (v.url) return preferH264First([{ url: v.url, mimeType: v.mimeType || "" }]);
+    return [];
+  }
+
+  function preferH264First(list) {
+    if (!Array.isArray(list) || list.length <= 1) return list || [];
+    const isH264 = (s) => {
+      const mt = (s && s.mimeType) ? String(s.mimeType).toLowerCase() : "";
+      const url = (s && s.url) ? String(s.url).toLowerCase() : "";
+      if (mt.includes("video/mp4")) return true;
+      if (mt.includes("avc1") || mt.includes("h264")) return true;
+      if (url.endsWith(".mp4")) return true;
+      if (url.includes("codecs=avc1") || url.includes("codecs%3davc1")) return true;
+      return false;
+    };
+    return list.slice().sort((a, b) => {
+      const aw = isH264(a) ? 1 : 0;
+      const bw = isH264(b) ? 1 : 0;
+      return bw - aw;
+    });
+  }
+
+  function clearMediaSources(media) {
+    if (!media) return;
+    const sources = media.querySelectorAll("source");
+    sources.forEach((source) => {
+      source.removeAttribute("src");
+      source.removeAttribute("type");
+    });
+    while (media.firstChild) media.removeChild(media.firstChild);
+    media.removeAttribute("src");
+    media.load();
+  }
+
+  function setMediaSources(media, sourcesList) {
+    if (!media) return;
+    while (media.firstChild) media.removeChild(media.firstChild);
+    if (Array.isArray(sourcesList) && sourcesList.length > 0) {
+      for (const s of sourcesList) {
+        if (!s || !s.url) continue;
+        const source = document.createElement("source");
+        source.src = s.url;
+        if (s.mimeType) source.type = s.mimeType;
+        media.appendChild(source);
+      }
+    } else {
+      media.src = "";
+    }
+    media.load();
+  }
+
+  // 以前の同期ループを無効化（古いループを止める）
+  const syncToken = (video.__syncPlaybackToken || 0) + 1;
+  video.__syncPlaybackToken = syncToken;
+  const isActive = () => video.__syncPlaybackToken === syncToken;
 
   let videoSrc, audioSrc;
   if (selectedQuality.value !== "muxed360p" && sources.value[selectedQuality.value]) {
@@ -18,62 +89,56 @@ export function setupSyncPlayback(video, audio, sources, selectedQuality, diffTe
   } else {
     return;
   }
+  const videoSources = normalizeSources(videoSrc);
+  const audioSources = normalizeSources(audioSrc);
+  const audioUrl = audioSources[0]?.url || "";
+  const audioMime = audioSources[0]?.mimeType || "";
 
-  // --- Safari専用シンプル同期 ---
   if (safariMode) {
-    // 画質変更時は必ずpauseしてsrcをクリア
     video.pause();
     audio.pause();
-    video.src = "";
-    audio.src = "";
-    video.load();
-    audio.load();
+    clearMediaSources(video);
+    clearMediaSources(audio);
 
     // 新しいソースをセット
-    video.src = videoSrc;
-    audio.src = audioSrc;
+    setMediaSources(video, videoSources);
+    setMediaSources(audio, audioUrl ? [{ url: audioUrl, mimeType: audioMime }] : []);
 
     // 初期倍速反映
     video.playbackRate = selectedPlaybackRate.value;
     audio.playbackRate = selectedPlaybackRate.value;
 
-    // 既存イベントを解除
-    video.onplay = null;
-    audio.onplay = null;
-    video.onpause = null;
-    audio.onpause = null;
-    video.onseeking = null;
-
-    // イベント登録（毎回新規登録）
-    video.addEventListener("play", () => {
+    // イベント登録（上書き）
+    video.onplay = () => {
       video.playbackRate = selectedPlaybackRate.value;
       audio.playbackRate = selectedPlaybackRate.value;
       if (audio.paused) audio.play().catch(() => {});
-    });
-    audio.addEventListener("play", () => {
+    };
+    audio.onplay = () => {
       video.playbackRate = selectedPlaybackRate.value;
       audio.playbackRate = selectedPlaybackRate.value;
       if (video.paused) video.play().catch(() => {});
-    });
-    video.addEventListener("pause", () => {
+    };
+    video.onpause = () => {
       if (!audio.paused) audio.pause();
-    });
-    audio.addEventListener("pause", () => {
+    };
+    audio.onpause = () => {
       if (!video.paused) video.pause();
-    });
-    video.addEventListener("seeking", () => {
+    };
+    video.onseeking = () => {
       audio.currentTime = video.currentTime;
-    });
+    };
 
     // 再生再開時にも音声再生を保証
-    video.addEventListener("playing", () => {
+    video.onplaying = () => {
       if (audio.paused) audio.play().catch(() => {});
-    });
+    };
 
     // --- Safari用：緩い同期補正 ---
     let lastJumpTime = 0;
     const jumpInterval = 1000; // ms
     function looseSync() {
+      if (!isActive()) return;
       if (!video.paused) {
         // 音声が流れていない場合は再生
         if (audio.paused) {
@@ -112,17 +177,15 @@ export function setupSyncPlayback(video, audio, sources, selectedQuality, diffTe
     return; // Safariはここで終了
   }
 
-  // --- ここから非Safari用の既存同期処理 ---
-  // 画質変更時は必ずpauseしてsrcをクリア
+  // --- ここから非 Safari 用の既存同期処理 ---
+  // 画質変更時は必ず pause して src をクリア
   video.pause();
   audio.pause();
-  video.src = "";
-  audio.src = "";
-  video.load();
-  audio.load();
+  clearMediaSources(video);
+  clearMediaSources(audio);
   // 新しいソースをセット
-  video.src = videoSrc;
-  audio.src = audioSrc;
+  setMediaSources(video, videoSources);
+  setMediaSources(audio, audioUrl ? [{ url: audioUrl, mimeType: audioMime }] : []);
 
   let isStartupJumpDone = false;
   let isBuffering = false;
@@ -223,17 +286,16 @@ export function setupSyncPlayback(video, audio, sources, selectedQuality, diffTe
     }
   }
 
-  video.addEventListener("play", () => playBoth(true));
-  audio.addEventListener("play", () => playBoth(true));
-  video.addEventListener("pause", pauseBoth);
-  audio.addEventListener("pause", pauseBoth);
+  audio.onplay = () => playBoth(true);
+  video.onpause = () => pauseBoth();
+  audio.onpause = () => pauseBoth();
 
-  video.addEventListener("waiting", () => {
+  video.onwaiting = () => {
     isBuffering = true;
     if (!audio.paused) audio.pause();
-  });
+  };
 
-  video.addEventListener("playing", () => {
+  video.onplaying = () => {
     // Safari: 映像再生再開時に音声も再生
     if (safariMode) {
       if (audio.paused && !isSyncingPlayback) {
@@ -249,16 +311,17 @@ export function setupSyncPlayback(video, audio, sources, selectedQuality, diffTe
         audio.play().catch(() => {});
       }
     }
-  });
+  };
 
   // 再生開始
   video.onplay = () => {
+    playBoth(true);
     video.playbackRate = selectedPlaybackRate.value;
     audio.playbackRate = selectedPlaybackRate.value; // 先に設定
 
     if (video.readyState >= 2) {
       if (audio.paused && !isSyncingPlayback) {
-        // audio.play()の直後はplaybackRate変更しない
+        // audio.play() の直後は playbackRate を変更しない
         audio.play().catch(() => {});
       }
     } else {
@@ -283,6 +346,7 @@ export function setupSyncPlayback(video, audio, sources, selectedQuality, diffTe
   };
 
   function syncLoop() {
+    if (!isActive()) return;
     if (!video.paused && !audio.paused) {
       const diff = video.currentTime - audio.currentTime;
       diffText.value = `${(diff * 1000).toFixed(0)} ms`;

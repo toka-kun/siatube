@@ -49,7 +49,7 @@
       </li>
     </ul>
 
-    <p v-else-if="!error" style="color: var(--text-primary);">コメントが見つかりません。</p>
+    <p v-else-if="!error" style="color: var(--text-primary);">コメントが見つかりません。ライブ配信の場合は取得できません</p>
     <p v-if="error" class="error-msg" style="color: var(--accent-weak);">⚠️ {{ error }}<br />
       <button @click="fetchComments" class="retry-btn" type="button">再取得</button>
     </p>

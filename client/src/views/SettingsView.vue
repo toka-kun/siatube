@@ -5,7 +5,12 @@
       <!-- ヘッダー -->
       <div class="settings-modal-header">
         <h2>設定</h2>
-        <button type="button" class="close-button" @click="closeSettings" aria-label="設定を閉じる">
+        <button
+          type="button"
+          class="close-button"
+          @click="closeSettings"
+          aria-label="設定を閉じる"
+        >
           ✕
         </button>
       </div>
@@ -22,48 +27,6 @@
             <label><input type="radio" :checked="mode === 'custom'" @change="handleModeChange('custom')" /> カスタムのみを使用</label>
             <label><input type="radio" :checked="mode === 'both'" @change="handleModeChange('both')" /> 両方をランダムに使用</label>
           </div>
-        </section>
-
-        <!-- デフォルト再生方式 -->
-        <section class="settings-section">
-          <h3>デフォルト再生方式</h3>
-          <label><input type="radio" :checked="defaultPlaybackMode === '1'" @change="handlePlaybackModeChange('1')" /> 通常</label>
-          <label><input type="radio" :checked="defaultPlaybackMode === '2'" @change="handlePlaybackModeChange('2')" /> タイプ２</label>
-        </section>
-
-        <!-- 短動画フィルタ設定 -->
-        <section class="settings-section">
-          <h3>自動再生フィルタ</h3>
-          <label>
-            <input
-              type="checkbox"
-              :checked="shortVideoFilterEnabled"
-              @change="handleFilterEnabledChange($event.target.checked)"
-            />
-            指定時間以下の動画のみ自動再生
-          </label>
-          <div v-if="shortVideoFilterEnabled" class="filter-time">
-            <label>
-              制限時間（分）:
-              <input
-                type="number"
-                :value="shortVideoFilterMinutes"
-                @change="handleFilterMinutesChange(+$event.target.value)"
-                min="1"
-                max="120"
-                step="1"
-              />
-            </label><br>
-            <small>{{ shortVideoFilterMinutes }}分以下の動画のみが自動再生対象になります</small>
-          </div>
-        </section>
-
-        <!-- 表示設定（デバイスに合わせる / ライト / ダーク） -->
-        <section class="settings-section">
-          <h3>表示設定</h3>
-          <label><input type="radio" :checked="displayMode === 'device'" @change="handleDisplayModeChange('device')" /> デバイスに合わせる</label>
-          <label><input type="radio" :checked="displayMode === 'light'" @change="handleDisplayModeChange('light')" /> ライトモード</label>
-          <label><input type="radio" :checked="displayMode === 'dark'" @change="handleDisplayModeChange('dark')" /> ダークモード</label>
         </section>
 
         <!-- カスタムエンドポイント -->
@@ -89,7 +52,106 @@
             <button type="button" @click="addEndpoint">追加</button>
           </div>
         </section>
-        
+
+        <!-- デフォルト再生方式 -->
+        <section class="settings-section">
+          <h3>デフォルト再生方式</h3>
+          <label
+            ><input
+              type="radio"
+              :checked="defaultPlaybackMode === '1'"
+              @change="handlePlaybackModeChange('1')"
+            />
+            通常</label
+          >
+          <label
+            ><input
+              type="radio"
+              :checked="defaultPlaybackMode === '2'"
+              @change="handlePlaybackModeChange('2')"
+            />
+            タイプ２</label
+          >
+        </section>
+
+        <!-- 優先画質 -->
+        <section class="settings-section">
+          <h3>タイプ２優先画質</h3>
+          <label>
+            画質:
+            <select
+              class="selector"
+              :value="preferredQuality"
+              @change="handlePreferredQualityChange($event.target.value)"
+            >
+              <option v-for="q in preferredQualityOptions" :key="q" :value="q">
+                {{ preferredQualityLabels[q] || q }}
+              </option>
+            </select>
+          </label>
+          <small>自動、または指定解像度がない場合は自動選択になります</small>
+        </section>
+
+        <!-- 短動画フィルタ設定 -->
+        <section class="settings-section">
+          <h3>自動再生フィルタ</h3>
+          <label>
+            <input
+              type="checkbox"
+              :checked="shortVideoFilterEnabled"
+              @change="handleFilterEnabledChange($event.target.checked)"
+            />
+            指定時間以下の動画のみ自動再生
+          </label>
+          <div v-if="shortVideoFilterEnabled" class="filter-time">
+            <label>
+              制限時間（分）:
+              <input
+                type="number"
+                :value="shortVideoFilterMinutes"
+                @change="handleFilterMinutesChange(+$event.target.value)"
+                min="1"
+                max="120"
+                step="1"
+              /> </label
+            ><br />
+            <small
+              >{{
+                shortVideoFilterMinutes
+              }}分以下の動画のみが自動再生対象になります</small
+            >
+          </div>
+        </section>
+
+        <!-- 表示設定（デバイスに合わせる / ライト / ダーク） -->
+        <section class="settings-section">
+          <h3>表示設定</h3>
+          <label
+            ><input
+              type="radio"
+              :checked="displayMode === 'device'"
+              @change="handleDisplayModeChange('device')"
+            />
+            デバイスに合わせる</label
+          >
+          <label
+            ><input
+              type="radio"
+              :checked="displayMode === 'light'"
+              @change="handleDisplayModeChange('light')"
+            />
+            ライトモード</label
+          >
+          <label
+            ><input
+              type="radio"
+              :checked="displayMode === 'dark'"
+              @change="handleDisplayModeChange('dark')"
+            />
+            ダークモード</label
+          >
+        </section>
+
         <!-- その他 -->
         <section class="settings-section">
           <h3>その他</h3>
@@ -123,7 +185,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, inject, watch, computed } from 'vue';
+import { ref, onMounted, inject, watch, computed } from "vue";
 import CustomEndpointsHelp from "@/components/CustomEndpointsHelp.vue";
 import {
   loadCustomEndpoints as rmLoadCustomEndpoints,
@@ -142,12 +204,14 @@ import {
   loadCustomEndpointsJsonpOnly,
   saveCustomEndpointsJsonpOnly,
   isValidUrl,
+  loadDisableTimeouts,
+  saveDisableTimeouts,
+  loadPreferredQuality,
+  savePreferredQuality,
 } from "@/utils/settingsManager";
 
-// Inject settings modal state
-const settingsModal = inject('settingsModal', {});
-console.log('[SettingsView.vue] Injected settingsModal:', settingsModal);
-console.log('[SettingsView.vue] settingsModal.isOpen:', settingsModal?.isOpen);
+// 設定モーダルの状態
+const settingsModal = inject("settingsModal", {});
 
 // Settings state
 const customEndpoints = ref([]);
@@ -156,28 +220,53 @@ const mode = ref("existing");
 const defaultPlaybackMode = ref("1");
 const shortVideoFilterEnabled = ref(false);
 const shortVideoFilterMinutes = ref(4);
-const displayMode = ref('device');
+const displayMode = ref("device");
 const jsonpOnlyForCustom = ref(false);
 const disableTimeouts = ref(true);
+const preferredQuality = ref("auto");
+const preferredQualityOptions = [
+  "auto",
+  "2160p",
+  "1440p",
+  "1080p",
+  "720p",
+  "480p",
+  "360p",
+  "240p",
+  "144p",
+  "audio",
+];
+const preferredQualityLabels = {
+  auto: "自動",
+  audio: "音声のみ",
+};
 
 // Backup state (for cancel functionality)
 const backupState = ref({});
 
 // localStorage キー
-const STORAGE_KEY = 'youtube_settings';
+const STORAGE_KEY = "youtube_settings";
 
 onMounted(() => {
-  console.log('[SettingsView.vue] onMounted called');
-  console.log('[SettingsView.vue] Current settingsModal.isOpen value:', settingsModal?.isOpen?.value);
   loadSettings();
   // apply current display mode to document
   try {
     applyDisplayMode(displayMode.value);
   } catch (e) {}
   saveBackup();
-  
+
   // 設定をlocalStorageに保存するwatcher
-  watch([customEndpoints, mode, defaultPlaybackMode, shortVideoFilterEnabled, shortVideoFilterMinutes, displayMode, jsonpOnlyForCustom], 
+  watch(
+    [
+      customEndpoints,
+      mode,
+      defaultPlaybackMode,
+      shortVideoFilterEnabled,
+      shortVideoFilterMinutes,
+      displayMode,
+      jsonpOnlyForCustom,
+      preferredQuality,
+    ],
     () => {
       saveToLocalStorage();
     },
@@ -188,27 +277,23 @@ onMounted(() => {
 // computed boolean for template v-if — explicitly unwrap the ref value
 const modalIsOpen = computed(() => {
   try {
-    if (settingsModal && settingsModal.isOpen && typeof settingsModal.isOpen.value !== 'undefined') {
+    if (
+      settingsModal &&
+      settingsModal.isOpen &&
+      typeof settingsModal.isOpen.value !== "undefined"
+    ) {
       return !!settingsModal.isOpen.value;
     }
     // Fallback to localStorage if injected ref is missing
-    const stored = localStorage.getItem('settingsModalOpen');
-    return stored === 'true';
+    const stored = localStorage.getItem("settingsModalOpen");
+    return stored === "true";
   } catch (e) {
     return false;
   }
 });
 
-// watch underlying ref for debugging
-if (settingsModal && settingsModal.isOpen) {
-  watch(settingsModal.isOpen, (v) => {
-    console.log('[SettingsView.vue] watch: settingsModal.isOpen changed ->', v);
-  });
-}
-
-// When modal opens, save backup of current settings so Cancel can restore
+// モーダルを開いた時点の状態をバックアップ
 watch(modalIsOpen, (open) => {
-  console.log('[SettingsView.vue] watch: modalIsOpen ->', open);
   if (open) saveBackup();
 });
 
@@ -224,18 +309,18 @@ const loadSettings = () => {
   try {
     const savedSettings = loadFromLocalStorage();
     if (savedSettings) {
-      console.log('[SettingsView.vue] Loading settings from localStorage:', savedSettings);
       customEndpoints.value = savedSettings.customEndpoints || [];
-      mode.value = savedSettings.mode || 'existing';
-      defaultPlaybackMode.value = savedSettings.defaultPlaybackMode || '1';
-      shortVideoFilterEnabled.value = savedSettings.shortVideoFilterEnabled || false;
-      shortVideoFilterMinutes.value = savedSettings.shortVideoFilterMinutes || 4;
-      displayMode.value = savedSettings.displayMode || 'device';
+      mode.value = savedSettings.mode || "existing";
+      defaultPlaybackMode.value = savedSettings.defaultPlaybackMode || "1";
+      shortVideoFilterEnabled.value =
+        savedSettings.shortVideoFilterEnabled || false;
+      shortVideoFilterMinutes.value =
+        savedSettings.shortVideoFilterMinutes || 4;
+      displayMode.value = savedSettings.displayMode || "device";
+      preferredQuality.value = savedSettings.preferredQuality || "auto";
       return;
     }
-  } catch (e) {
-    console.warn('[SettingsView.vue] Failed to load from localStorage:', e);
-  }
+  } catch (e) {}
 
   // Load custom endpoints
   try {
@@ -262,7 +347,13 @@ const loadSettings = () => {
   try {
     displayMode.value = loadDisplayMode();
   } catch (e) {
-    displayMode.value = 'device';
+    displayMode.value = "device";
+  }
+  // Load preferred quality
+  try {
+    preferredQuality.value = loadPreferredQuality();
+  } catch (e) {
+    preferredQuality.value = "auto";
   }
 
   // JSONPのみ設定の読み込み（カスタムエンドポイント用）
@@ -289,18 +380,14 @@ const saveBackup = () => {
     shortVideoFilterMinutes: shortVideoFilterMinutes.value,
     displayMode: displayMode.value,
     jsonpOnlyForCustom: jsonpOnlyForCustom.value,
+    preferredQuality: preferredQuality.value,
   };
 };
 
 const closeSettings = () => {
-  console.log('[SettingsView.vue] closeSettings called - closing modal without resetting changes');
-  
-  // Close modal via injected function (changes are already saved via watchers)
+  // 変更は watcher で保存済み
   if (settingsModal?.closeSettingsModal) {
-    console.log('[SettingsView.vue] Calling closeSettingsModal()');
     settingsModal.closeSettingsModal();
-  } else {
-    console.warn('[SettingsView.vue] WARNING: closeSettingsModal is not available');
   }
 };
 
@@ -327,17 +414,21 @@ const handleFilterMinutesChange = (minutes) => {
   saveShortVideoFilter(shortVideoFilterEnabled.value, minutes);
 };
 
+const handlePreferredQualityChange = (quality) => {
+  preferredQuality.value = quality;
+  try {
+    savePreferredQuality(quality);
+  } catch (e) {}
+};
+
 const applyDisplayMode = (mode) => {
   try {
     const isDark = computeIsDarkFromMode(mode);
-    console.log(`[SettingsView] applyDisplayMode: mode=${mode} -> isDark=${isDark}`);
-    if (isDark) document.documentElement.classList.add('dark-mode');
-    else document.documentElement.classList.remove('dark-mode');
+    if (isDark) document.documentElement.classList.add("dark-mode");
+    else document.documentElement.classList.remove("dark-mode");
     // do NOT set darkMode here to avoid legacy key conflicts
     // displayMode is the source of truth, darkMode is only for legacy compatibility
-  } catch (e) {
-    console.error('[SettingsView] applyDisplayMode error', e);
-  }
+  } catch (e) {}
 };
 
 const handleDisplayModeChange = (newMode) => {
@@ -353,18 +444,14 @@ const handleJsonpOnlyChange = (enabled) => {
   jsonpOnlyForCustom.value = !!enabled;
   try {
     saveCustomEndpointsJsonpOnly(!!enabled);
-  } catch (e) {
-    console.warn('[SettingsView.vue] Failed to persist jsonpOnlyForCustom', e);
-  }
+  } catch (e) {}
 };
 
 const handleDisableTimeoutsChange = (enabled) => {
   disableTimeouts.value = !!enabled;
   try {
     saveDisableTimeouts(!!enabled);
-  } catch (e) {
-    console.warn('[SettingsView.vue] Failed to persist disableTimeouts', e);
-  }
+  } catch (e) {}
 };
 
 const handleNewEndpointChange = (value) => {
@@ -389,11 +476,9 @@ const addEndpoint = () => {
 
   // Automatically switch API mode to "custom" when a custom endpoint is added
   try {
-    mode.value = 'custom';
-    rmSaveMode('custom');
-  } catch (e) {
-    console.warn('[SettingsView.vue] Failed to persist api mode change to custom', e);
-  }
+    mode.value = "custom";
+    rmSaveMode("custom");
+  } catch (e) {}
 };
 
 const removeEndpoint = (index) => {
@@ -413,13 +498,11 @@ const saveToLocalStorage = () => {
       jsonpOnlyForCustom: jsonpOnlyForCustom.value,
       disableTimeouts: disableTimeouts.value,
       displayMode: displayMode.value,
-      timestamp: Date.now()
+      preferredQuality: preferredQuality.value,
+      timestamp: Date.now(),
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settingsData));
-    console.log('[SettingsView.vue] Settings saved to localStorage:', settingsData);
-  } catch (e) {
-    console.error('[SettingsView.vue] Failed to save to localStorage:', e);
-  }
+  } catch (e) {}
 };
 
 const loadFromLocalStorage = () => {
@@ -427,24 +510,20 @@ const loadFromLocalStorage = () => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       const data = JSON.parse(stored);
-      console.log('[SettingsView.vue] Loaded from localStorage:', data);
-      if (typeof data.jsonpOnlyForCustom !== 'undefined') jsonpOnlyForCustom.value = !!data.jsonpOnlyForCustom;
-      if (typeof data.disableTimeouts !== 'undefined') disableTimeouts.value = !!data.disableTimeouts;
+      if (typeof data.jsonpOnlyForCustom !== "undefined")
+        jsonpOnlyForCustom.value = !!data.jsonpOnlyForCustom;
+      if (typeof data.disableTimeouts !== "undefined")
+        disableTimeouts.value = !!data.disableTimeouts;
       return data;
     }
-  } catch (e) {
-    console.error('[SettingsView.vue] Failed to load from localStorage:', e);
-  }
+  } catch (e) {}
   return null;
 };
 
 const clearLocalStorage = () => {
   try {
     localStorage.removeItem(STORAGE_KEY);
-    console.log('[SettingsView.vue] localStorage cleared');
-  } catch (e) {
-    console.error('[SettingsView.vue] Failed to clear localStorage:', e);
-  }
+  } catch (e) {}
 };
 </script>
 
@@ -477,7 +556,10 @@ const clearLocalStorage = () => {
 .settings-modal {
   position: fixed;
   top: 52px;
-  left: var(--sidebar-offset, 250px); /* CSS variable を使ってサイドバー幅に追従 */
+  left: var(
+    --sidebar-offset,
+    250px
+  ); /* CSS variable を使ってサイドバー幅に追従 */
   bottom: 0;
   width: 380px;
   max-width: none;
@@ -659,7 +741,8 @@ const clearLocalStorage = () => {
   border-radius: 4px;
   background-color: var(--bg-primary);
   color: var(--text-primary);
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+  transition: background-color 0.3s ease, color 0.3s ease,
+    border-color 0.3s ease;
 }
 
 .add-row input[type="text"]:focus {

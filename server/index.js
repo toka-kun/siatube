@@ -1,66 +1,76 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
+import { Readable } from "stream";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// dist配信
-app.use(express.static(path.join(__dirname, "../client/dist")));
+const distPath = path.join(__dirname, "../client/dist"); 
+const PROXY_BASE = "https://siawaseok.duckdns.org";
 
-// Simple server-side proxy for external API endpoints.
-// This helps when the browser blocks cross-origin JSONP/script resources (eg. net::ERR_BLOCKED_BY_ORB).
-// Very basic safety checks are included to avoid proxying local/private addresses.
-app.get("/api/proxy", async (req, res) => {
-  const target = req.query.url;
-  if (!target) return res.status(400).json({ error: "missing url" });
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true }));
+
+app.use(["/exec", "/api"], async (req, res) => {
+  const targetUrl = PROXY_BASE + req.originalUrl;
+  console.log(`[PROXY] ${req.method} ${targetUrl}`);
+
   try {
-    const turl = new URL(target);
-    const host = turl.hostname;
-    // Reject obvious private/loopback hosts
-    if (
-      host === "localhost" ||
-      host === "::1" ||
-      host === "127.0.0.1" ||
-      /^10\.|^127\.|^192\.168\.|^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host)
-    ) {
-      return res.status(400).json({ error: "disallowed host" });
+    const headers = {};
+    for (const [key, value] of Object.entries(req.headers)) {
+      if (key.toLowerCase() === "host") continue;
+      headers[key] = value;
     }
 
-    const fetched = await fetch(target);
-    const text = await fetched.text();
-    const ct = fetched.headers.get("content-type") || "";
+    const options = {
+      method: req.method,
+      headers: headers,
+      redirect: "manual",
+    };
 
-    // If it's JSON, forward parsed JSON
-    if (ct.includes("json")) {
-      try {
-        return res.json(JSON.parse(text));
-      } catch (e) {}
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      if (req.body && Object.keys(req.body).length > 0) {
+        options.body = JSON.stringify(req.body);
+        if (!headers["content-type"]) {
+          headers["content-type"] = "application/json";
+        }
+      }
     }
 
-    // Try to unwrap JSONP: look for the first '(' and last ')' and parse the contents
-    const m = text.match(/\(\s*([\s\S]*)\s*\)\s*;?\s*$/);
-    if (m && m[1]) {
-      try {
-        return res.json(JSON.parse(m[1]));
-      } catch (e) {}
+    const response = await fetch(targetUrl, options);
+    res.status(response.status);
+
+    response.headers.forEach((value, key) => {
+      res.setHeader(key, value);
+    });
+
+    if (response.body) {
+      Readable.fromWeb(response.body).pipe(res);
+    } else {
+      res.end();
     }
 
-    // Fallback: return raw text inside a JSON envelope
-    return res.json({ raw: text });
+    console.log(`[PROXY OK] ${response.status}`);
   } catch (err) {
-    console.warn("proxy error", err);
-    res.status(500).json({ error: "proxy_error", message: String(err) });
+    console.error("[PROXY ERROR]", err);
+    res.status(500).json({
+      error: "proxy_error",
+      message: String(err),
+    });
   }
 });
 
+app.use(express.static(distPath));
+
 app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "../client/dist/index.html"));
+  res.sendFile(path.join(distPath, "index.html"));
 });
 
-// サーバー起動
 app.listen(PORT, () => {
-  console.log(`✅ Server running at http://localhost:${PORT}`);
+  console.log(`✅ Server running`);
+  console.log(`http://localhost:${PORT}`);
 });
