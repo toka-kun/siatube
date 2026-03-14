@@ -10,11 +10,13 @@ const STORAGE_KEYS = {
   DISPLAY_MODE: 'displayMode',
   CUSTOM_ENDPOINTS_JSONP_ONLY: 'customEndpointsJsonpOnly',
   DISABLE_TIMEOUTS: 'disableTimeouts',
+  PREFERRED_QUALITY: 'preferredQuality',
 };
 
 const DEFAULTS = {
   DEFAULT_PLAYBACK_MODE: '1',
   SHORT_VIDEO_MINUTES: 4,
+  PREFERRED_QUALITY: 'auto',
 };
 
 function safeSetItem(key, value) {
@@ -218,6 +220,34 @@ export function saveDisableTimeouts(enabled) {
 }
 
 /**
+ * 優先画質を保存
+ * @param {string} quality
+ */
+export function savePreferredQuality(quality) {
+  try {
+    const q = String(quality || DEFAULTS.PREFERRED_QUALITY);
+    safeSetItem(STORAGE_KEYS.PREFERRED_QUALITY, q);
+  } catch (e) {
+    console.error('savePreferredQuality error', e);
+  }
+}
+
+/**
+ * 優先画質を読み込み
+ * @returns {string}
+ */
+export function loadPreferredQuality() {
+  try {
+    const stored = safeGetItem(STORAGE_KEYS.PREFERRED_QUALITY, null);
+    if (stored !== null && stored !== undefined && stored !== '') return String(stored);
+    return DEFAULTS.PREFERRED_QUALITY;
+  } catch (e) {
+    console.error('loadPreferredQuality error', e);
+    return DEFAULTS.PREFERRED_QUALITY;
+  }
+}
+
+/**
  * タイムアウトを無効化する設定を読み込み
  * デフォルトは true
  * @returns {boolean}
@@ -281,4 +311,6 @@ export default {
   loadCustomEndpointsJsonpOnly,
   saveDisableTimeouts,
   loadDisableTimeouts,
+  savePreferredQuality,
+  loadPreferredQuality,
 };

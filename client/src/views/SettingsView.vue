@@ -55,6 +55,24 @@
           >
         </section>
 
+        <!-- 優先画質 -->
+        <section class="settings-section">
+          <h3>タイプ２優先画質</h3>
+          <label>
+            画質:
+            <select
+              class="selector"
+              :value="preferredQuality"
+              @change="handlePreferredQualityChange($event.target.value)"
+            >
+              <option v-for="q in preferredQualityOptions" :key="q" :value="q">
+                {{ preferredQualityLabels[q] || q }}
+              </option>
+            </select>
+          </label>
+          <small>自動、または指定解像度がない場合は自動選択になります</small>
+        </section>
+
         <!-- 短動画フィルタ設定 -->
         <section class="settings-section">
           <h3>自動再生フィルタ</h3>
@@ -169,12 +187,14 @@ import {
   loadCustomEndpointsJsonpOnly,
   saveCustomEndpointsJsonpOnly,
   isValidUrl,
+  loadDisableTimeouts,
+  saveDisableTimeouts,
+  loadPreferredQuality,
+  savePreferredQuality,
 } from "@/utils/settingsManager";
 
-// Inject settings modal state
+// 設定モーダルの状態
 const settingsModal = inject("settingsModal", {});
-console.log("[SettingsView.vue] Injected settingsModal:", settingsModal);
-console.log("[SettingsView.vue] settingsModal.isOpen:", settingsModal?.isOpen);
 
 // Settings state
 const customEndpoints = ref([]);
@@ -186,6 +206,23 @@ const shortVideoFilterMinutes = ref(4);
 const displayMode = ref("device");
 const jsonpOnlyForCustom = ref(false);
 const disableTimeouts = ref(true);
+const preferredQuality = ref("auto");
+const preferredQualityOptions = [
+  "auto",
+  "2160p",
+  "1440p",
+  "1080p",
+  "720p",
+  "480p",
+  "360p",
+  "240p",
+  "144p",
+  "audio",
+];
+const preferredQualityLabels = {
+  auto: "自動",
+  audio: "音声のみ",
+};
 
 // Backup state (for cancel functionality)
 const backupState = ref({});
@@ -194,11 +231,6 @@ const backupState = ref({});
 const STORAGE_KEY = "youtube_settings";
 
 onMounted(() => {
-  console.log("[SettingsView.vue] onMounted called");
-  console.log(
-    "[SettingsView.vue] Current settingsModal.isOpen value:",
-    settingsModal?.isOpen?.value
-  );
   loadSettings();
   // apply current display mode to document
   try {
@@ -216,6 +248,7 @@ onMounted(() => {
       shortVideoFilterMinutes,
       displayMode,
       jsonpOnlyForCustom,
+      preferredQuality,
     ],
     () => {
       saveToLocalStorage();
@@ -242,16 +275,8 @@ const modalIsOpen = computed(() => {
   }
 });
 
-// watch underlying ref for debugging
-if (settingsModal && settingsModal.isOpen) {
-  watch(settingsModal.isOpen, (v) => {
-    console.log("[SettingsView.vue] watch: settingsModal.isOpen changed ->", v);
-  });
-}
-
-// When modal opens, save backup of current settings so Cancel can restore
+// モーダルを開いた時点の状態をバックアップ
 watch(modalIsOpen, (open) => {
-  console.log("[SettingsView.vue] watch: modalIsOpen ->", open);
   if (open) saveBackup();
 });
 
@@ -267,10 +292,6 @@ const loadSettings = () => {
   try {
     const savedSettings = loadFromLocalStorage();
     if (savedSettings) {
-      console.log(
-        "[SettingsView.vue] Loading settings from localStorage:",
-        savedSettings
-      );
       customEndpoints.value = savedSettings.customEndpoints || [];
       mode.value = savedSettings.mode || "existing";
       defaultPlaybackMode.value = savedSettings.defaultPlaybackMode || "1";
@@ -279,11 +300,10 @@ const loadSettings = () => {
       shortVideoFilterMinutes.value =
         savedSettings.shortVideoFilterMinutes || 4;
       displayMode.value = savedSettings.displayMode || "device";
+      preferredQuality.value = savedSettings.preferredQuality || "auto";
       return;
     }
-  } catch (e) {
-    console.warn("[SettingsView.vue] Failed to load from localStorage:", e);
-  }
+  } catch (e) {}
 
   // Load custom endpoints
   try {
@@ -312,6 +332,12 @@ const loadSettings = () => {
   } catch (e) {
     displayMode.value = "device";
   }
+  // Load preferred quality
+  try {
+    preferredQuality.value = loadPreferredQuality();
+  } catch (e) {
+    preferredQuality.value = "auto";
+  }
 
   // JSONPのみ設定の読み込み（カスタムエンドポイント用）
   try {
@@ -337,22 +363,14 @@ const saveBackup = () => {
     shortVideoFilterMinutes: shortVideoFilterMinutes.value,
     displayMode: displayMode.value,
     jsonpOnlyForCustom: jsonpOnlyForCustom.value,
+    preferredQuality: preferredQuality.value,
   };
 };
 
 const closeSettings = () => {
-  console.log(
-    "[SettingsView.vue] closeSettings called - closing modal without resetting changes"
-  );
-
-  // Close modal via injected function (changes are already saved via watchers)
+  // 変更は watcher で保存済み
   if (settingsModal?.closeSettingsModal) {
-    console.log("[SettingsView.vue] Calling closeSettingsModal()");
     settingsModal.closeSettingsModal();
-  } else {
-    console.warn(
-      "[SettingsView.vue] WARNING: closeSettingsModal is not available"
-    );
   }
 };
 
@@ -379,19 +397,21 @@ const handleFilterMinutesChange = (minutes) => {
   saveShortVideoFilter(shortVideoFilterEnabled.value, minutes);
 };
 
+const handlePreferredQualityChange = (quality) => {
+  preferredQuality.value = quality;
+  try {
+    savePreferredQuality(quality);
+  } catch (e) {}
+};
+
 const applyDisplayMode = (mode) => {
   try {
     const isDark = computeIsDarkFromMode(mode);
-    console.log(
-      `[SettingsView] applyDisplayMode: mode=${mode} -> isDark=${isDark}`
-    );
     if (isDark) document.documentElement.classList.add("dark-mode");
     else document.documentElement.classList.remove("dark-mode");
     // do NOT set darkMode here to avoid legacy key conflicts
     // displayMode is the source of truth, darkMode is only for legacy compatibility
-  } catch (e) {
-    console.error("[SettingsView] applyDisplayMode error", e);
-  }
+  } catch (e) {}
 };
 
 const handleDisplayModeChange = (newMode) => {
@@ -407,18 +427,14 @@ const handleJsonpOnlyChange = (enabled) => {
   jsonpOnlyForCustom.value = !!enabled;
   try {
     saveCustomEndpointsJsonpOnly(!!enabled);
-  } catch (e) {
-    console.warn("[SettingsView.vue] Failed to persist jsonpOnlyForCustom", e);
-  }
+  } catch (e) {}
 };
 
 const handleDisableTimeoutsChange = (enabled) => {
   disableTimeouts.value = !!enabled;
   try {
     saveDisableTimeouts(!!enabled);
-  } catch (e) {
-    console.warn("[SettingsView.vue] Failed to persist disableTimeouts", e);
-  }
+  } catch (e) {}
 };
 
 const handleNewEndpointChange = (value) => {
@@ -445,12 +461,7 @@ const addEndpoint = () => {
   try {
     mode.value = "custom";
     rmSaveMode("custom");
-  } catch (e) {
-    console.warn(
-      "[SettingsView.vue] Failed to persist api mode change to custom",
-      e
-    );
-  }
+  } catch (e) {}
 };
 
 const removeEndpoint = (index) => {
@@ -470,16 +481,11 @@ const saveToLocalStorage = () => {
       jsonpOnlyForCustom: jsonpOnlyForCustom.value,
       disableTimeouts: disableTimeouts.value,
       displayMode: displayMode.value,
+      preferredQuality: preferredQuality.value,
       timestamp: Date.now(),
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settingsData));
-    console.log(
-      "[SettingsView.vue] Settings saved to localStorage:",
-      settingsData
-    );
-  } catch (e) {
-    console.error("[SettingsView.vue] Failed to save to localStorage:", e);
-  }
+  } catch (e) {}
 };
 
 const loadFromLocalStorage = () => {
@@ -487,26 +493,20 @@ const loadFromLocalStorage = () => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       const data = JSON.parse(stored);
-      console.log("[SettingsView.vue] Loaded from localStorage:", data);
       if (typeof data.jsonpOnlyForCustom !== "undefined")
         jsonpOnlyForCustom.value = !!data.jsonpOnlyForCustom;
       if (typeof data.disableTimeouts !== "undefined")
         disableTimeouts.value = !!data.disableTimeouts;
       return data;
     }
-  } catch (e) {
-    console.error("[SettingsView.vue] Failed to load from localStorage:", e);
-  }
+  } catch (e) {}
   return null;
 };
 
 const clearLocalStorage = () => {
   try {
     localStorage.removeItem(STORAGE_KEY);
-    console.log("[SettingsView.vue] localStorage cleared");
-  } catch (e) {
-    console.error("[SettingsView.vue] Failed to clear localStorage:", e);
-  }
+  } catch (e) {}
 };
 </script>
 

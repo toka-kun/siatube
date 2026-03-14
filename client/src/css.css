@@ -1,5 +1,6 @@
 :root {
   --normal-color:#000000;
+  --svg-color:#000000;
   --normal-text: #1a1a1a;
   --normal-back-color: #f8f8f8;
   --bg-primary: #ffffff;
@@ -31,6 +32,7 @@
 
 html.dark-mode {
   --normal-color:#ffffff;
+  --svg-color:#ffffff;
   --normal-text: #e8e8e8;
   --normal-back-color: #1f1e1e;
   --bg-primary: #1a1a1a;

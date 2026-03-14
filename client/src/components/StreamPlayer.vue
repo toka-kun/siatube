@@ -45,6 +45,10 @@ function getDefaultStreamType() {
 }
 
 const currentStreamType = ref(getDefaultStreamType());
+console.log("[StreamPlayer] setup", {
+  propStreamType: props.streamType,
+  initial: currentStreamType.value,
+});
 
 function reloadStream() {
   // 各子コンポーネントで再取得用に渡すだけ
@@ -70,16 +74,25 @@ onMounted(() => {
     const defaultType = getDefaultStreamType();
     currentStreamType.value = defaultType;
   }
+  console.log("[StreamPlayer] mounted", {
+    propStreamType: props.streamType,
+    current: currentStreamType.value,
+  });
 });
 
 watch(
   () => props.streamType,
   (newType) => {
+    console.log("[StreamPlayer] props.streamType changed", { newType });
     if (newType) {
       currentStreamType.value = newType;
     }
   }
 );
+
+watch(currentStreamType, (val) => {
+  console.log("[StreamPlayer] currentStreamType changed", { val });
+});
 </script>
 
 <style scoped>
