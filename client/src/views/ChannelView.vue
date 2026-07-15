@@ -108,7 +108,7 @@
           <div class="thumbnail-wrapper">
             <img
               v-if="!loadingChannel"
-              :src="getPrimaryThumbnail(channel.topVideo.videoId)"
+              :src="channel.topVideo.thumbnail || getPrimaryThumbnail(channel.topVideo.videoId)"
               alt="トップ動画サムネイル"
               class="thumbnail"
               @error="onImageError($event, channel.topVideo.videoId)"
@@ -217,32 +217,12 @@
               class="playlist-item"
             >
               <router-link
-                :to="
-                  item.icon
-                    ? `/channel/${item.videoId}`
-                    : `/watch?v=${item.videoId}`
-                "
+                :to="`/watch?v=${item.videoId}`"
                 class="video-link"
               >
                 <div class="thumbnail-wrapper small-thumb">
                   <div>
-                    <!-- icon がある場合 -->
-                    <template v-if="item.icon && !loadingChannel">
-                      <div class="center">
-                        <a :to="`/channel/${item.videoId}`">
-                          <img
-                            :src="item.icon"
-                            alt="チャンネルアイコン"
-                            class="round"
-                          />
-                        </a>
-                      </div>
-                    </template>
-                    <template v-else-if="item.icon && loadingChannel">
-                      <div class="skeleton round"></div>
-                    </template>
-                    <!-- icon がない場合 -->
-                    <template v-else-if="!item.icon && !loadingChannel">
+                    <template v-if="!loadingChannel">
                       <img
                         :src="
                           item.thumbnail || getPrimaryThumbnail(item.videoId)
@@ -273,38 +253,29 @@
                     "
                   ></div>
                 </div>
-                <p v-if="item.icon && !loadingChannel" class="center-text">
-                  {{ item.title }}
-                </p>
-                <div
-                  v-else-if="item.icon && loadingChannel"
-                  class="skeleton skeleton-text center-text"
-                  style="width: 60%; height: 1em"
-                ></div>
                 <p
                   :class="title"
-                  v-if="!item.icon && !loadingChannel"
+                  v-if="!loadingChannel"
                   class="left-text"
                   style="font-weight: 600"
                 >
                   {{ item.title }}
                 </p>
                 <div
-                  v-else-if="!item.icon && loadingChannel"
+                  v-else
                   class="skeleton skeleton-text left-text"
                   style="width: 80%; height: 1em"
                 ></div>
-                <p class="author" v-if="!item.icon && !loadingChannel">
+                <p class="author" v-if="!loadingChannel">
                   {{ item.author }}
                 </p>
                 <div
-                  v-else-if="!item.icon && loadingChannel"
+                  v-else
                   class="skeleton skeleton-text left-text"
                   style="width: 40%; height: 1em"
                 ></div>
                 <p
-                  class="meta"
-                  :class="item.icon ? 'center-text' : 'left-text'"
+                  class="meta left-text"
                   v-if="!loadingChannel"
                 >
                   {{ item.viewCount
@@ -393,7 +364,8 @@ import settingIcon from "/Image/linkicon.txt?raw";
 import { ref, onMounted, watch, computed, onUnmounted } from "vue";
 import { useRoute } from "vue-router";
 import VideoList from "@/components/Playlist.vue";
-import { apiRequest } from "@/services/requestManager";
+import { channel as fetchChannel } from "@/services/siatubeApi";
+import { normalizeChannel } from "@/utils/siatubeAdapters";
 import subscriptionManager from "@/utils/subscriptionManager";
 
 const props = defineProps({ channelId: String });
@@ -407,9 +379,14 @@ const channel = ref(null);
 const tab = ref("home");
 const loadingChannel = ref(false);
 const subscribed = ref(false);
+let channelRequestSequence = 0;
 
 function updateSubscribed() {
   subscribed.value = subscriptionManager.isSubscribed(effectiveId.value);
+}
+
+function handleSubscriptionStorage(event) {
+  if (event.key === "subscriptions_v1") updateSubscribed();
 }
 
 async function toggleSubscribeOnChannel() {
@@ -473,29 +450,28 @@ function onImageError(event, id) {
   }
 }
 
-function fetchChannelInfo(channelId) {
+async function fetchChannelInfo(channelId) {
+  const sequence = ++channelRequestSequence;
   loadingChannel.value = true;
   channel.value = null;
-  apiRequest({
-    params: { channel: channelId },
-    method: "GET",
-    retries: 2,
-    timeout: 15000,
-  })
-    .then((data) => {
-      channel.value = data;
-    })
-    .catch((err) => {
-      console.error("チャンネル情報取得失敗:", err);
-      channel.value = null;
-    })
-    .finally(() => {
-      loadingChannel.value = false;
+  try {
+    const data = await fetchChannel(channelId, {
+      retries: 2,
+      timeout: 15000,
     });
+    if (sequence !== channelRequestSequence || channelId !== effectiveId.value) return;
+    channel.value = normalizeChannel(data);
+  } catch (err) {
+    if (sequence !== channelRequestSequence || channelId !== effectiveId.value) return;
+    console.error("チャンネル情報取得失敗:", err);
+    channel.value = null;
+  } finally {
+    if (sequence === channelRequestSequence) loadingChannel.value = false;
+  }
 }
 
 function reloadChannel() {
-  fetchChannelInfo(route.params.id);
+  fetchChannelInfo(effectiveId.value);
 }
 
 // 初回取得
@@ -503,9 +479,7 @@ onMounted(() => {
   fetchChannelInfo(effectiveId.value);
   updateSubscribed();
   window.addEventListener("subscriptions-changed", updateSubscribed);
-  window.addEventListener("storage", (e) => {
-    if (e.key === "subscriptions_v1") updateSubscribed();
-  });
+  window.addEventListener("storage", handleSubscriptionStorage);
 });
 
 // ID変更時（prop かルートどちらでも追跡）
@@ -521,7 +495,9 @@ watch(
 );
 
 onUnmounted(() => {
+  channelRequestSequence += 1;
   window.removeEventListener("subscriptions-changed", updateSubscribed);
+  window.removeEventListener("storage", handleSubscriptionStorage);
 });
 
 // channel変更時にタイトル更新

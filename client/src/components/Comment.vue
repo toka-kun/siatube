@@ -1,6 +1,14 @@
 <template>
   <section class="comments-section">
-    <h2 v-if="totalCommentCount !== null" style="color: var(--text-primary); margin-block-start: 0px;">{{ totalCommentCount }}</h2>
+    <div class="comments-heading">
+      <h2 style="color: var(--text-primary); margin-block-start: 0px;">
+        コメント<span v-if="totalCommentCount !== null"> ({{ totalCommentCount }})</span>
+      </h2>
+      <select v-model="sort" :disabled="loading" @change="fetchComments()" aria-label="コメントの並び順">
+        <option value="top">評価順</option>
+        <option value="new">新しい順</option>
+      </select>
+    </div>
 
     <!-- ローディング表示 -->
     <p v-if="loading" style="color: var(--text-primary);">コメントを読み込み中...</p>
@@ -45,11 +53,54 @@
           <div class="comment-meta">
             <span class="comment-likes">👍 {{ c.likes }}</span>
           </div>
+
+          <button
+            v-if="(!c.repliesLoaded && c.replyContinuation) || c.repliesNextContinuation"
+            class="replies-btn"
+            type="button"
+            :disabled="c.repliesLoading"
+            @click="loadReplies(c)"
+          >
+            {{ c.repliesLoading
+              ? "返信を読み込み中…"
+              : c.repliesLoaded
+                ? "返信をさらに表示"
+                : `返信を表示${c.replyCount ? ` (${c.replyCount})` : ""}` }}
+          </button>
+          <p v-if="c.repliesError" class="error-msg">{{ c.repliesError }}</p>
+
+          <ul v-if="c.replies.length" class="reply-list">
+            <li v-for="(reply, replyIndex) in c.replies" :key="reply.id || replyIndex" class="reply-item">
+              <img
+                v-if="reply.authorIcon"
+                :src="reply.authorIcon"
+                alt="アイコン"
+                class="comment-author-icon"
+                width="28"
+                height="28"
+                loading="lazy"
+              />
+              <div class="comment-content">
+                <div class="comment-header">
+                  <div class="comment-author">{{ reply.author }}</div>
+                  <span class="comment-meta comment-date">{{ reply.date }}</span>
+                </div>
+                <div class="comment-text">{{ reply.text }}</div>
+                <div class="comment-meta">👍 {{ reply.likes }}</div>
+              </div>
+            </li>
+          </ul>
         </div>
       </li>
     </ul>
 
-    <p v-else-if="!error" style="color: var(--text-primary);">コメントが見つかりません。ライブ配信の場合は取得できません</p>
+    <div v-if="comments.length && nextContinuation" class="comments-more">
+      <button type="button" class="retry-btn" :disabled="loadingMore" @click="fetchMoreComments">
+        {{ loadingMore ? "さらに読み込み中…" : "コメントをさらに表示" }}
+      </button>
+    </div>
+
+    <p v-if="!loading && !error && comments.length === 0" style="color: var(--text-primary);">コメントが見つかりません。ライブ配信の場合は取得できません</p>
     <p v-if="error" class="error-msg" style="color: var(--accent-weak);">⚠️ {{ error }}<br />
       <button @click="fetchComments" class="retry-btn" type="button">再取得</button>
     </p>
@@ -57,7 +108,11 @@
 </template>
 
 <script>
-import { apiRequest } from "@/services/requestManager";
+import {
+  comments as fetchCommentsApi,
+  commentReplies as fetchCommentReplies,
+} from "@/services/siatubeApi";
+import { normalizeComment } from "@/utils/siatubeAdapters";
 
 export default {
   name: "Comment",
@@ -73,6 +128,10 @@ export default {
       totalCommentCount: null,
       error: null,
       loading: false,
+      loadingMore: false,
+      sort: "top",
+      nextContinuation: null,
+      requestSequence: 0,
     };
   },
   watch: {
@@ -94,42 +153,86 @@ export default {
     });
   },
   methods: {
-    async fetchComments() {
+    async fetchComments(options = {}) {
+      const append = options?.append === true;
+      const sequence = append ? this.requestSequence : ++this.requestSequence;
       this.error = null;
-      this.comments = [];
-      this.totalCommentCount = null;
-      this.loading = true;
+      if (append) {
+        this.loadingMore = true;
+      } else {
+        this.loadingMore = false;
+        this.comments = [];
+        this.totalCommentCount = null;
+        this.nextContinuation = null;
+        this.loading = true;
+      }
 
       try {
-        const data = await apiRequest({
-          params: { comments: this.videoId },
+        const data = await fetchCommentsApi(this.videoId, {
+          sort: this.sort,
+          continuation: append ? this.nextContinuation : undefined,
           retries: 1,
           timeout: 15000,
-          jsonpFallback: true,
         });
+        if (sequence !== this.requestSequence) return;
 
-        this.totalCommentCount = data?.totalCommentCount ?? null;
-
-        if (Array.isArray(data?.comments)) {
-          this.comments = data.comments.map((c, index) => ({
-            id: c.id || index,
-            author: c.author || "匿名",
-            authorIcon: c.authorIcon || null,
-            text: c.text || "",
-            date: c.date || "",
-            likes: c.likes ?? 0,
-            isExpanded: false,
-            isClamped: false,
-          }));
+        const incoming = Array.isArray(data?.comments)
+          ? data.comments.map((comment, index) => normalizeComment(comment, this.comments.length + index))
+          : [];
+        if (append) {
+          const seen = new Set(this.comments.map((comment) => comment.id));
+          this.comments.push(...incoming.filter((comment) => !seen.has(comment.id)));
         } else {
-          this.comments = [];
+          this.comments = incoming;
         }
+        this.totalCommentCount = data?.totalComments ?? this.totalCommentCount ?? this.comments.length;
+        this.nextContinuation = data?.nextContinuation || null;
       } catch (e) {
+        if (sequence !== this.requestSequence) return;
         console.warn("fetchComments error:", e);
-        this.error = "コメントの取得に失敗しました";
-        this.comments = [];
+        this.error = append
+          ? "コメントの追加取得に失敗しました"
+          : "コメントの取得に失敗しました";
+        if (!append) this.comments = [];
       } finally {
-        this.loading = false;
+        if (sequence === this.requestSequence) {
+          this.loading = false;
+          this.loadingMore = false;
+        }
+      }
+    },
+
+    fetchMoreComments() {
+      if (!this.nextContinuation || this.loadingMore) return;
+      this.fetchComments({ append: true });
+    },
+
+    async loadReplies(comment) {
+      if (!comment || comment.repliesLoading) return;
+      const continuation = comment.repliesLoaded
+        ? comment.repliesNextContinuation
+        : comment.replyContinuation;
+      if (!continuation) return;
+
+      comment.repliesLoading = true;
+      comment.repliesError = "";
+      try {
+        const data = await fetchCommentReplies(this.videoId, continuation, {
+          retries: 1,
+          timeout: 15000,
+        });
+        const incoming = Array.isArray(data?.replies)
+          ? data.replies.map((reply, index) => normalizeComment(reply, index))
+          : [];
+        const seen = new Set(comment.replies.map((reply) => reply.id));
+        comment.replies.push(...incoming.filter((reply) => !seen.has(reply.id)));
+        comment.repliesLoaded = true;
+        comment.repliesNextContinuation = data?.nextContinuation || null;
+      } catch (error) {
+        console.warn("fetchCommentReplies error:", error);
+        comment.repliesError = "返信の取得に失敗しました";
+      } finally {
+        comment.repliesLoading = false;
       }
     },
 
@@ -186,6 +289,21 @@ export default {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
+.comments-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.comments-heading select {
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
 .comment-list {
   list-style: none;
   padding: 0;
@@ -207,6 +325,33 @@ export default {
 
 .comment-content {
   flex: 1;
+}
+
+.reply-list {
+  list-style: none;
+  padding: 8px 0 0 12px;
+  margin: 0;
+}
+
+.reply-item {
+  display: flex;
+  align-items: flex-start;
+  padding: 8px 0;
+}
+
+.replies-btn {
+  margin-top: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--accent-color);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.comments-more {
+  display: flex;
+  justify-content: center;
+  padding-top: 12px;
 }
 
 .comment-author {

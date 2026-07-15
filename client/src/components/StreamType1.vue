@@ -1,116 +1,182 @@
 <template>
   <div v-if="error" class="error-box">
     ⚠️ {{ error }}
-    <button @click="reloadStream" class="reload-button">再取得</button>
+    <button type="button" class="reload-button" @click="loadStream(true)">再取得</button>
   </div>
-  <div v-else-if="streamUrl" class="video-container">
-    <iframe
-      :src="streamUrl"
-      frameborder="0"
-      allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-      allowfullscreen
-      referrerpolicy="strict-origin-when-cross-origin"
-      title="動画ストリーム"
-    ></iframe>
+  <div v-else-if="stream" class="video-container">
+    <video
+      ref="videoRef"
+      :key="`${videoId}:${stream.url}`"
+      controls
+      playsinline
+      preload="metadata"
+      @ended="handleEnded"
+      @error="handlePlaybackError"
+    >
+      <source v-if="!useHlsJs" :src="stream.url" :type="stream.mimeType" />
+      <track
+        v-for="track in subtitleTracks"
+        :key="`${track.srclang}:${track.src}`"
+        :src="track.src"
+        :srclang="track.srclang"
+        :label="track.label"
+        :kind="track.kind"
+        :default="track.default"
+      />
+    </video>
   </div>
-  <div v-else-if="loading" style="height: 50px">読み込み中...</div>
+  <div v-else-if="loading" class="loading">読み込み中...</div>
 </template>
 
 <script setup>
-import { ref, watch } from "vue";
-import { apiRequest } from "@/services/requestManager";
+import { nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { stream as fetchStream } from "@/services/siatubeApi";
+import { loadHlsConstructor } from "@/utils/hlsLoader";
+import {
+  localizeSubtitleTracks,
+  revokeSubtitleTracks,
+  selectPlaybackSubtitleTracks,
+} from "@/utils/subtitleTracks";
+import {
+  extractSubtitleTracks,
+  primaryPlayableStream,
+} from "@/utils/siatubeAdapters";
 
 const props = defineProps({
-  videoId: { type: String, required: true }
+  videoId: { type: String, required: true },
 });
 
-const streamUrl = ref("");
+const emit = defineEmits([
+  "ended",
+  "play-autoplay-candidate",
+  "autoplay-no-suitable-video",
+]);
+
+const stream = ref(null);
+const subtitleTracks = ref([]);
+const videoRef = ref(null);
+const useHlsJs = ref(false);
 const error = ref("");
 const loading = ref(false);
+let requestSequence = 0;
+let hlsInstance = null;
+let HlsConstructor = null;
 
-// --- キャッシュ用 ---
-let cachedParams = null;
-let cachedAt = 0; // タイムスタンプ(ms)
-
-function reloadStream() {
-  fetchStream(props.videoId);
+function destroyHls() {
+  if (!hlsInstance) return;
+  try { hlsInstance.destroy(); } catch (e) {}
+  hlsInstance = null;
 }
 
-const sheetId = "1dily2wiik92TAyK3zyIsu8TDuyYNoF20IM1iMk_X-pg";
-const sheetName = "Youtube-education-parameter";
-const range = "A1";
-
-async function fetchParamsFromSheet() {
-  const now = Date.now();
-  // 1時間(3600000ms)以内ならキャッシュを使う
-  if (cachedParams && now - cachedAt < 3600000) {
-    return cachedParams;
-  }
-
-  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${sheetName}&range=${range}`;
-  try {
-    const res = await fetch(url);
-    const text = await res.text();
-    const jsonStr = text.match(/google\.visualization\.Query\.setResponse\((.*)\);/s)[1];
-    const data = JSON.parse(jsonStr);
-    const params = data.table.rows?.[0]?.c?.[0]?.v;
-    if (!params) throw new Error("スプレッドシートに値がありません");
-
-    // キャッシュ更新
-    cachedParams = params;
-    cachedAt = now;
-
-    return params;
-  } catch (err) {
-    console.warn("スプレッドシート取得失敗:", err);
-    return null; // 失敗したら null を返す
-  }
+function supportsNativeHls() {
+  const video = document.createElement("video");
+  return Boolean(
+    video.canPlayType("application/vnd.apple.mpegurl") ||
+    video.canPlayType("application/x-mpegURL")
+  );
 }
 
-async function fetchStream(id) {
-  streamUrl.value = "";
+async function loadStream(forceRefresh = false) {
+  const id = props.videoId;
+  if (!id) return;
+  const sequence = ++requestSequence;
+  destroyHls();
+  stream.value = null;
+  revokeSubtitleTracks(subtitleTracks.value);
+  subtitleTracks.value = [];
+  useHlsJs.value = false;
   error.value = "";
   loading.value = true;
 
-  let params = await fetchParamsFromSheet();
-
-  // スプレッドシート取得できなかったら従来の apiRequest
-  if (!params) {
-    try {
-      const data = await apiRequest({
-        params: { stream: id },
-        retries: 1,
-        timeout: 60000,
-        jsonpFallback: false,
-      });
-      if (data && data.url) {
-        streamUrl.value = data.url;
-      } else {
-        error.value = "ストリームURLが空です (JSON)";
-      }
-      return;
-    } catch (err) {
-      if (err && err.name === "AbortError") {
-        error.value = "ストリームURLの取得に失敗しました (タイムアウト)";
-      } else {
-        error.value = "ストリームURLの取得に失敗しました (fetch error)";
-      }
-      return;
-    } finally {
-      loading.value = false;
+  try {
+    const data = await fetchStream(id, {
+      forceRefresh: forceRefresh === true,
+      retries: 1,
+      timeout: 30000,
+    });
+    if (sequence !== requestSequence) return;
+    const locale = typeof navigator !== "undefined" ? navigator.language : "ja";
+    stream.value = primaryPlayableStream(data, locale);
+    const rawSubtitleTracks = selectPlaybackSubtitleTracks(
+      extractSubtitleTracks(data, locale)
+    );
+    if (!stream.value) error.value = "利用可能なストリームがありません。";
+    if (stream.value?.isM3u8 && !supportsNativeHls()) {
+      HlsConstructor = await loadHlsConstructor();
+      if (sequence !== requestSequence || id !== props.videoId) return;
     }
+    useHlsJs.value = Boolean(
+      stream.value?.isM3u8 && !supportsNativeHls() && HlsConstructor?.isSupported()
+    );
+    if (useHlsJs.value) {
+      await nextTick();
+      if (sequence !== requestSequence || id !== props.videoId || !videoRef.value) return;
+      hlsInstance = new HlsConstructor();
+      hlsInstance.loadSource(stream.value.url);
+      hlsInstance.attachMedia(videoRef.value);
+      hlsInstance.on(HlsConstructor.Events.ERROR, (_event, data) => {
+        if (data?.fatal && sequence === requestSequence) {
+          error.value = "HLSストリームを再生できませんでした。";
+          destroyHls();
+        }
+      });
+    }
+    const localizedTracks = await localizeSubtitleTracks(rawSubtitleTracks);
+    if (sequence !== requestSequence || id !== props.videoId) {
+      revokeSubtitleTracks(localizedTracks);
+      return;
+    }
+    subtitleTracks.value = localizedTracks;
+  } catch (cause) {
+    if (sequence !== requestSequence) return;
+    error.value = cause?.name === "AbortError"
+      ? "ストリームURLの取得がタイムアウトしました。"
+      : "ストリームURLの取得に失敗しました。";
+  } finally {
+    if (sequence === requestSequence) loading.value = false;
   }
-
-  // スプレッドシートから params が取れた場合
-  streamUrl.value = `https://www.youtubeeducation.com/embed/${id}${params}`;
-  loading.value = false;
 }
+
+function handlePlaybackError() {
+  if (!loading.value) error.value = "このストリームを再生できませんでした。";
+}
+
+function durationSeconds(value) {
+  if (!value) return null;
+  const parts = String(value).split(":").map(Number);
+  if (parts.some((part) => !Number.isFinite(part))) return null;
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  return null;
+}
+
+function handleEnded() {
+  emit("ended");
+  const filter = window.__autoplayDurationFilter || { enabled: false };
+  if (!filter.enabled) return;
+
+  let foundCandidate = false;
+  for (const element of document.querySelectorAll("[data-video-id]")) {
+    const id = element.getAttribute("data-video-id");
+    if (!id || id === props.videoId) continue;
+    foundCandidate = true;
+    const seconds = durationSeconds(element.getAttribute("data-duration"));
+    if (seconds !== null && seconds > Number(filter.maxSeconds || Infinity)) continue;
+    emit("play-autoplay-candidate", { id });
+    return;
+  }
+  if (foundCandidate) emit("autoplay-no-suitable-video");
+}
+
+onBeforeUnmount(() => {
+  requestSequence += 1;
+  destroyHls();
+  revokeSubtitleTracks(subtitleTracks.value);
+});
 
 watch(
   () => props.videoId,
-  (newId) => {
-    if (newId) fetchStream(newId);
-  },
+  () => loadStream(),
   { immediate: true }
 );
 </script>
@@ -122,17 +188,24 @@ watch(
   background: #000;
   overflow: hidden;
 }
-.video-container iframe {
-  position: absolute;
-  top: 0;
-  left: 0;
+
+.video-container video {
   width: 100%;
   height: 100%;
+  display: block;
+  background: #000;
 }
+
+.loading {
+  height: 50px;
+  color: var(--text-primary);
+}
+
 .error-box {
   color: var(--accent-weak);
   margin: 10px;
 }
+
 .reload-button {
   margin-top: 6px;
   padding: 6px 12px;
@@ -145,8 +218,8 @@ watch(
   transition: background-color 0.2s ease;
   width: 50%;
 }
+
 .reload-button:hover {
   background: var(--text-secondary-hover);
-  color: var(--on-accent);
 }
 </style>

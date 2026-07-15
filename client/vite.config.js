@@ -15,7 +15,7 @@ export default defineConfig({
     allowedHosts: ["tpj4gl-5173.csb.app"],
     proxy: {
       "/api": {
-        target: "http://localhost:5000",
+        target: "https://siatube.com",
         changeOrigin: true,
       },
     },

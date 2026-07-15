@@ -467,7 +467,7 @@
     />
     <div v-else-if="error" class="error-msg">
       ⚠️ {{ error }}<br />
-      <button class="reload-btn" @click="reloadVideo">再取得</button><br>カスタムエンドポイントを設定していない場合、設定からカスタムエンドポイントのを追加してください　＊1~3分で作れます
+      <button class="reload-btn" @click="reloadVideo">再取得</button>
     </div>
     <p v-else class="loading-msg">読み込み中...</p>
 
@@ -514,7 +514,7 @@ function switchStream() {
 </script>
 
 <script>
-import { apiRequest } from "@/services/requestManager";
+import { video as fetchVideo } from "@/services/siatubeApi";
 import { addVideoToHistory } from "@/utils/historyManager";
 import PlaylistComponent from "@/components/Playlist.vue";
 import Comment from "@/components/Comment.vue";
@@ -560,6 +560,8 @@ export default {
       loadingMore: false,
       subscribedLocal: false,
       showCollaboratorsPopup: false,
+      videoRequestSequence: 0,
+      relatedRequestSequence: 0,
     };
   },
   computed: {
@@ -661,7 +663,7 @@ export default {
         if (item.type === "playlist") {
           return {
             type: item.type,
-            base64imge: item.thumbnail || "",
+            base64imge: item.thumbnail || item.thumbnails?.[0]?.url || "",
             badge: "",
             title: item.title || "",
             metadataRow1: "再生リスト",
@@ -675,7 +677,7 @@ export default {
         } else {
           return {
             type: item.type,
-            base64imge: item.thumbnail || "",
+            base64imge: item.thumbnail || item.thumbnails?.[0]?.url || "",
             badge: item.badge || "",
             title: item.title || "",
             metadataRow1: item.channelName || "",
@@ -996,6 +998,10 @@ export default {
     // --- fetchのみ（JSONのみ対応）
     async fetchVideoData(id) {
       const maxRetries = 3;
+      const sequence = ++this.videoRequestSequence;
+      this.relatedRequestSequence += 1;
+      this.loadingMore = false;
+      this.nextContinuationToken = null;
       if (!id) {
         this.video = null;
         this.error = "動画IDが指定されていません。";
@@ -1005,14 +1011,12 @@ export default {
       try {
         this.video = null;
         this.error = null;
-        // requestManager の apiRequest を使って中央集約されたリクエストを実行
-        const data = await apiRequest({
-          // Use raw query formatting required: video=動画ID==p==depth==i==1
-          params: { __rawQuery: `video=${id}==p==depth==i==1` },
-          method: "GET",
+        const data = await fetchVideo(id, {
+          depth: 2,
           retries: maxRetries,
           timeout: 15000,
         });
+        if (sequence !== this.videoRequestSequence || id !== this.videoId) return;
 
         this.video = data;
         this.nextContinuationToken =
@@ -1036,9 +1040,11 @@ export default {
             description: data.description,
             thumbnail: data.thumbnail,
           });
+          if (sequence !== this.videoRequestSequence || id !== this.videoId) return;
         } catch (historyError) {
           console.warn("Failed to save to history:", historyError);
         }
+        if (sequence !== this.videoRequestSequence || id !== this.videoId) return;
 
         if (
           !data["Related-videos"] ||
@@ -1051,6 +1057,7 @@ export default {
         this.showCollaboratorsPopup = false;
         return;
       } catch (err) {
+        if (sequence !== this.videoRequestSequence || id !== this.videoId) return;
         console.error("fetchVideoData error:", err);
         this.video = null;
         // エラーメッセージは既存の UI 用文字列を使う
@@ -1091,33 +1098,42 @@ export default {
     },
     async loadMoreRelatedVideos() {
       if (!this.nextContinuationToken || this.loadingMore) return;
+      const videoId = this.videoId;
+      const token = this.nextContinuationToken;
+      const sequence = ++this.relatedRequestSequence;
       this.loadingMore = true;
       try {
-        const data = await apiRequest({
-          // Use raw query formatting required:
-          // video=動画ID==p==token==i==トークン==p==depth==i==2
-          params: {
-            __rawQuery: `video=${this.videoId}==p==token==i==${this.nextContinuationToken}==p==depth==i==2`,
-          },
-          method: "GET",
+        const data = await fetchVideo(videoId, {
+          token,
+          depth: 2,
           retries: 3,
           timeout: 15000,
         });
+        if (sequence !== this.relatedRequestSequence || videoId !== this.videoId) return;
         if (
           data["Related-videos"] &&
           Array.isArray(data["Related-videos"].relatedVideos)
         ) {
-          // Append new related videos
-          this.video["Related-videos"].relatedVideos.push(
-            ...data["Related-videos"].relatedVideos
+          const current = this.video["Related-videos"].relatedVideos;
+          const seen = new Set(
+            current.map((item) => `${item.type || "video"}:${item.videoId}:${item.playlistId || ""}`)
+          );
+          current.push(
+            ...data["Related-videos"].relatedVideos.filter((item) => {
+              const key = `${item.type || "video"}:${item.videoId}:${item.playlistId || ""}`;
+              if (!item.videoId || seen.has(key)) return false;
+              seen.add(key);
+              return true;
+            })
           );
           this.nextContinuationToken =
             data["Related-videos"].nextContinuationToken || null;
         }
       } catch (err) {
+        if (sequence !== this.relatedRequestSequence || videoId !== this.videoId) return;
         console.error("loadMoreRelatedVideos error:", err);
       } finally {
-        this.loadingMore = false;
+        if (sequence === this.relatedRequestSequence) this.loadingMore = false;
       }
     },
     handleClickOutside(event) {

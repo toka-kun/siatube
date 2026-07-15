@@ -8,7 +8,7 @@
     />
     <h3 class="related-title">関連動画</h3>
     <ul class="related-list">
-      <li v-for="(r, index) in relatedVideos" :key="r.videoId" :ref="(el) => { if (index === relatedVideos.length - 1) lastItem = el; }" class="related-item" :data-video-id="r.videoId">
+      <li v-for="(r, index) in relatedVideos" :key="`${r.type}:${r.videoId}:${r.replaylistId || ''}`" :ref="(el) => { if (index === relatedVideos.length - 1) lastItem = el; }" class="related-item" :data-video-id="r.videoId">
         <router-link v-if="r.videoId" :to="rLink(r)" class="page-link">
           <div class="thumb-wrapper">
             <img :src="r.base64imge" :alt="r.title" class="thumb-img" />
