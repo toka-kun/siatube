@@ -221,56 +221,7 @@ function validatePayload(payload, response, url) {
   return payload;
 }
 
-function hasAppsScriptBridge() {
-  if (typeof window === "undefined") return false;
-  const hostname = window.location?.hostname || "";
-  const isAppsScriptPage = hostname === "script.google.com" ||
-    hostname.endsWith(".googleusercontent.com");
-  return isAppsScriptPage && Boolean(window.google?.script?.run);
-}
-
-function appsScriptGet(url, signal) {
-  if (signal?.aborted) return Promise.reject(abortError(signal, url));
-
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    const finish = (callback, value) => {
-      if (settled) return;
-      settled = true;
-      signal?.removeEventListener?.("abort", onAbort);
-      callback(value);
-    };
-    const onAbort = () => finish(reject, abortError(signal, url));
-    signal?.addEventListener?.("abort", onAbort, { once: true });
-
-    const requestUrl = new URL(url);
-    const pathAndQuery = `${requestUrl.pathname}${requestUrl.search}`;
-    try {
-      window.google.script.run
-        .withSuccessHandler((result) => {
-          const status = Number(result?.status) || 500;
-          const body = typeof result?.body === "string"
-            ? result.body
-            : JSON.stringify(result?.body ?? null);
-          finish(resolve, {
-            ok: status >= 200 && status < 300,
-            status,
-            json: async () => JSON.parse(body),
-            text: async () => body,
-          });
-        })
-        .withFailureHandler((cause) => {
-          finish(reject, cause instanceof Error ? cause : new Error(String(cause)));
-        })
-        .siatubeApiGet(pathAndQuery);
-    } catch (cause) {
-      finish(reject, cause);
-    }
-  });
-}
-
 function performGet(url, options) {
-  if (hasAppsScriptBridge()) return appsScriptGet(url, options.signal);
   return fetch(url, options);
 }
 

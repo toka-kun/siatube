@@ -71,36 +71,17 @@ test("same-video stream requests share one in-flight API call and cache", async 
   assert.deepEqual(second, third);
 });
 
-test("Apps Script deployments use the server-side SiaTube bridge", async (t) => {
+test("Apps Script deployments call SiaTube directly", async (t) => {
   const originalWindow = globalThis.window;
   const originalFetch = globalThis.fetch;
-  let successHandler;
-  let failureHandler;
-  let requestedPath = "";
-  const runner = {
-    withSuccessHandler(handler) {
-      successHandler = handler;
-      return this;
-    },
-    withFailureHandler(handler) {
-      failureHandler = handler;
-      return this;
-    },
-    siatubeApiGet(path) {
-      requestedPath = path;
-      try {
-        successHandler({ status: 200, body: '["猫","猫 動画"]' });
-      } catch (error) {
-        failureHandler(error);
-      }
-    },
-  };
+  let requestedUrl = "";
   globalThis.window = {
     location: { hostname: "example.script.googleusercontent.com" },
-    google: { script: { run: runner } },
+    google: { script: { run: {} } },
   };
-  globalThis.fetch = async () => {
-    throw new Error("direct fetch must not run");
+  globalThis.fetch = async (url) => {
+    requestedUrl = String(url);
+    return jsonResponse(["猫", "猫 動画"]);
   };
   t.after(() => {
     globalThis.window = originalWindow;
@@ -109,5 +90,8 @@ test("Apps Script deployments use the server-side SiaTube bridge", async (t) => 
 
   const result = await suggest("猫");
   assert.deepEqual(result, ["猫", "猫 動画"]);
-  assert.equal(requestedPath, "/api/suggest/?keyword=%E7%8C%AB");
+  assert.equal(
+    requestedUrl,
+    "https://siatube.com/api/suggest/?keyword=%E7%8C%AB",
+  );
 });
