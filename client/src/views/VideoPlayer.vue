@@ -4,6 +4,7 @@
       <div class="video-wrapper">
         <StreamPlayer
           :videoId="videoId"
+          :videoTitle="title"
           :streamType="resolvedStreamType"
           @ended="onPlayerEnded"
           @play-autoplay-candidate="onPlayAutoplayCandidate"
@@ -454,7 +455,7 @@
           "
         />
       </div>
-      <Comment :videoId="videoId" />
+      <Comment :videoId="videoId" :commentToken="video?.Commenttoken || null" />
     </div>
 
     <RelatedList
@@ -1221,6 +1222,7 @@ export default {
     videoId: {
       immediate: true,
       handler(newId) {
+        this.showFullDescription = false;
         this.fetchVideoData(newId);
       },
     },

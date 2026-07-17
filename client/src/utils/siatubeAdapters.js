@@ -99,6 +99,7 @@ export function normalizeComment(comment, fallbackIndex = 0) {
     replies: [],
     repliesNextContinuation: null,
     repliesLoaded: false,
+    repliesExpanded: false,
     repliesLoading: false,
     repliesError: "",
     isExpanded: false,

@@ -42,6 +42,7 @@ test("resource helpers generate the documented paths and query parameters", asyn
   );
   assert.equal(urls[3].pathname, "/api/comments");
   assert.equal(urls[3].searchParams.get("sort"), "new");
+  assert.equal(urls[3].searchParams.get("continuation"), "comments");
   assert.equal(decodeURIComponent(urls[4].pathname), "/api/playlist/UUone====PLtwo");
 });
 

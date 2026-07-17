@@ -2,7 +2,10 @@
   <section class="comments-section">
     <div class="comments-heading">
       <h2 style="color: var(--text-primary); margin-block-start: 0px;">
-        コメント<span v-if="totalCommentCount !== null"> ({{ totalCommentCount }})</span>
+        <template v-if="totalCommentCount !== null">
+          {{ totalCommentCount }}件のコメント ({{ displayedCommentCount }}件表示中)
+        </template>
+        <template v-else>コメント</template>
       </h2>
       <select v-model="sort" :disabled="loading" @change="fetchComments()" aria-label="コメントの並び順">
         <option value="top">評価順</option>
@@ -55,21 +58,21 @@
           </div>
 
           <button
-            v-if="(!c.repliesLoaded && c.replyContinuation) || c.repliesNextContinuation"
+            v-if="!c.repliesExpanded && (c.replyContinuation || c.repliesLoaded)"
             class="replies-btn"
             type="button"
             :disabled="c.repliesLoading"
-            @click="loadReplies(c)"
+            @click="toggleReplies(c)"
           >
             {{ c.repliesLoading
               ? "返信を読み込み中…"
               : c.repliesLoaded
-                ? "返信をさらに表示"
+                ? `返信を表示${c.replyCount ? ` (${c.replyCount})` : ""}`
                 : `返信を表示${c.replyCount ? ` (${c.replyCount})` : ""}` }}
           </button>
           <p v-if="c.repliesError" class="error-msg">{{ c.repliesError }}</p>
 
-          <ul v-if="c.replies.length" class="reply-list">
+          <ul v-if="c.repliesExpanded && c.replies.length" class="reply-list">
             <li v-for="(reply, replyIndex) in c.replies" :key="reply.id || replyIndex" class="reply-item">
               <img
                 v-if="reply.authorIcon"
@@ -85,11 +88,40 @@
                   <div class="comment-author">{{ reply.author }}</div>
                   <span class="comment-meta comment-date">{{ reply.date }}</span>
                 </div>
-                <div class="comment-text">{{ reply.text }}</div>
+                <div
+                  class="comment-text"
+                  :class="{ clamped: reply.isClamped && !reply.isExpanded, expanded: reply.isExpanded }"
+                  :data-comment-index="i"
+                  :data-reply-index="replyIndex"
+                >
+                  {{ reply.text }}
+                </div>
+                <button
+                  v-if="reply.isClamped"
+                  class="read-more-btn"
+                  type="button"
+                  @click="toggleReplyExpand(i, replyIndex)"
+                >
+                  {{ reply.isExpanded ? "閉じる" : "もっと見る" }}
+                </button>
                 <div class="comment-meta">👍 {{ reply.likes }}</div>
               </div>
             </li>
           </ul>
+          <div v-if="c.repliesExpanded" class="reply-actions">
+            <button
+              v-if="c.repliesNextContinuation"
+              class="replies-btn"
+              type="button"
+              :disabled="c.repliesLoading"
+              @click="loadReplies(c)"
+            >
+              {{ c.repliesLoading ? "返信を読み込み中…" : "返信をさらに表示" }}
+            </button>
+            <button class="replies-btn" type="button" @click="toggleReplies(c)">
+              返信を閉じる
+            </button>
+          </div>
         </div>
       </li>
     </ul>
@@ -97,6 +129,9 @@
     <div v-if="comments.length && nextContinuation" class="comments-more">
       <button type="button" class="retry-btn" :disabled="loadingMore" @click="fetchMoreComments">
         {{ loadingMore ? "さらに読み込み中…" : "コメントをさらに表示" }}
+      </button>
+      <button type="button" class="retry-btn" @click="scrollToPageTop">
+        戻る
       </button>
     </div>
 
@@ -121,24 +156,36 @@ export default {
       type: String,
       required: true,
     },
+    commentToken: {
+      type: String,
+      default: null,
+    },
   },
   data() {
     return {
       comments: [],
       totalCommentCount: null,
+      displayedCommentCount: 0,
       error: null,
       loading: false,
       loadingMore: false,
       sort: "top",
       nextContinuation: null,
       requestSequence: 0,
+      scrollAnimationFrame: null,
     };
   },
   watch: {
     videoId: {
       immediate: true,
       handler() {
-        this.fetchComments();
+        this.resetComments();
+      },
+    },
+    commentToken: {
+      immediate: true,
+      handler(token) {
+        if (token) this.fetchComments();
       },
     },
   },
@@ -152,9 +199,26 @@ export default {
       this.checkCommentsHeight();
     });
   },
+  beforeUnmount() {
+    if (this.scrollAnimationFrame !== null) {
+      cancelAnimationFrame(this.scrollAnimationFrame);
+    }
+  },
   methods: {
+    resetComments() {
+      this.requestSequence += 1;
+      this.comments = [];
+      this.totalCommentCount = null;
+      this.displayedCommentCount = 0;
+      this.nextContinuation = null;
+      this.error = null;
+      this.loading = false;
+      this.loadingMore = false;
+    },
+
     async fetchComments(options = {}) {
       const append = options?.append === true;
+      if (!append && !this.commentToken) return;
       const sequence = append ? this.requestSequence : ++this.requestSequence;
       this.error = null;
       if (append) {
@@ -163,6 +227,7 @@ export default {
         this.loadingMore = false;
         this.comments = [];
         this.totalCommentCount = null;
+        this.displayedCommentCount = 0;
         this.nextContinuation = null;
         this.loading = true;
       }
@@ -170,7 +235,7 @@ export default {
       try {
         const data = await fetchCommentsApi(this.videoId, {
           sort: this.sort,
-          continuation: append ? this.nextContinuation : undefined,
+          continuation: append ? this.nextContinuation : this.commentToken,
           retries: 1,
           timeout: 15000,
         });
@@ -185,7 +250,16 @@ export default {
         } else {
           this.comments = incoming;
         }
-        this.totalCommentCount = data?.totalComments ?? this.totalCommentCount ?? this.comments.length;
+        if (!append) {
+          this.totalCommentCount = data?.totalComments ?? this.comments.length;
+        }
+        const responseCommentCount = Number(data?.CommentsCount);
+        const addedCount = Number.isFinite(responseCommentCount)
+          ? responseCommentCount
+          : incoming.length;
+        this.displayedCommentCount = append
+          ? this.displayedCommentCount + addedCount
+          : addedCount;
         this.nextContinuation = data?.nextContinuation || null;
       } catch (e) {
         if (sequence !== this.requestSequence) return;
@@ -205,6 +279,65 @@ export default {
     fetchMoreComments() {
       if (!this.nextContinuation || this.loadingMore) return;
       this.fetchComments({ append: true });
+    },
+
+    scrollToPageTop() {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    },
+
+    async toggleReplies(comment) {
+      if (!comment || comment.repliesLoading) return;
+      if (comment.repliesLoaded) {
+        const wasExpanded = comment.repliesExpanded;
+        comment.repliesExpanded = !comment.repliesExpanded;
+        if (wasExpanded) {
+          this.$nextTick(() => {
+            const commentIndex = this.comments.indexOf(comment);
+            const commentItems = this.$el.querySelectorAll(".comment-item");
+            this.scrollElementToCenter(commentItems[commentIndex]);
+          });
+        }
+        return;
+      }
+
+      await this.loadReplies(comment);
+      if (comment.repliesLoaded) comment.repliesExpanded = true;
+    },
+
+    scrollElementToCenter(element) {
+      if (!element) return;
+      if (this.scrollAnimationFrame !== null) {
+        cancelAnimationFrame(this.scrollAnimationFrame);
+      }
+
+      const startY = window.scrollY;
+      const rect = element.getBoundingClientRect();
+      const maxY = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      const targetY = Math.min(
+        maxY,
+        Math.max(0, startY + rect.top - (window.innerHeight - rect.height) / 2)
+      );
+      const distance = targetY - startY;
+      const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+      if (reduceMotion || Math.abs(distance) < 1) {
+        window.scrollTo(0, targetY);
+        this.scrollAnimationFrame = null;
+        return;
+      }
+
+      const duration = Math.min(800, Math.max(300, Math.abs(distance) / 0.92));
+      const startedAt = performance.now();
+      const animate = (now) => {
+        const progress = Math.min(1, (now - startedAt) / duration);
+        const eased = (1 - Math.cos(Math.PI * progress)) / 2;
+        window.scrollTo(0, startY + distance * eased);
+        if (progress < 1) {
+          this.scrollAnimationFrame = requestAnimationFrame(animate);
+        } else {
+          this.scrollAnimationFrame = null;
+        }
+      };
+      this.scrollAnimationFrame = requestAnimationFrame(animate);
     },
 
     async loadReplies(comment) {
@@ -237,7 +370,7 @@ export default {
     },
 
     checkCommentsHeight() {
-      const commentTextElements = this.$el.querySelectorAll(".comment-text");
+      const commentTextElements = this.$el.querySelectorAll(".comment-text[data-index]");
 
       commentTextElements.forEach((el) => {
         const index = Number(el.dataset.index);
@@ -250,6 +383,20 @@ export default {
         if (!this.comments[index].isExpanded && height <= 250) {
           this.comments[index].isClamped = false;
         }
+      });
+
+      const replyTextElements = this.$el.querySelectorAll(
+        ".comment-text[data-comment-index][data-reply-index]"
+      );
+      replyTextElements.forEach((el) => {
+        const commentIndex = Number(el.dataset.commentIndex);
+        const replyIndex = Number(el.dataset.replyIndex);
+        const reply = this.comments[commentIndex]?.replies?.[replyIndex];
+        if (!reply) return;
+
+        const isTooTall = el.scrollHeight > 250;
+        reply.isClamped = isTooTall;
+        if (!reply.isExpanded && !isTooTall) reply.isClamped = false;
       });
     },
 
@@ -264,6 +411,23 @@ export default {
           if (el) {
             el.scrollIntoView({ behavior: "smooth", block: "start" });
           }
+        });
+      }
+    },
+
+    toggleReplyExpand(commentIndex, replyIndex) {
+      const reply = this.comments[commentIndex]?.replies?.[replyIndex];
+      if (!reply) return;
+      reply.isExpanded = !reply.isExpanded;
+
+      if (!reply.isExpanded) {
+        this.$nextTick(() => {
+          const comment = this.comments[commentIndex];
+          const replyPosition = comment?.replies?.indexOf(reply);
+          const replyItems = this.$el.querySelectorAll(
+            `.comment-item:nth-child(${commentIndex + 1}) .reply-item`
+          );
+          replyItems[replyPosition]?.scrollIntoView({ behavior: "smooth", block: "start" });
         });
       }
     },
@@ -287,6 +451,7 @@ export default {
   background-color: var(--bg-primary);
   color: var(--text-primary);
   transition: background-color 0.3s ease, color 0.3s ease;
+  overflow-anchor: none;
 }
 
 .comments-heading {
@@ -348,9 +513,18 @@ export default {
   font-weight: 600;
 }
 
+.reply-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .comments-more {
   display: flex;
   justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
   padding-top: 12px;
 }
 
