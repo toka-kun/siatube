@@ -123,6 +123,72 @@ export function normalizePlaylistItem(item) {
   };
 }
 
+function normalizeChannelAttachment(attachment) {
+  if (!attachment || typeof attachment !== "object") return null;
+  return {
+    ...attachment,
+    type: attachment.type || "unknown",
+    videoId: attachment.videoId || "",
+    title: attachment.title || "",
+    images: asArray(attachment.images).filter(Boolean),
+    choices: asArray(attachment.choices).filter(Boolean),
+    totalVotes: attachment.totalVotes || "",
+  };
+}
+
+function normalizeChannelItem(item) {
+  if (!item || typeof item !== "object") return null;
+
+  const type = item.type || (item.postId ? "post" : item.playlistId ? "playlist" : "video");
+  const normalized = {
+    ...item,
+    type,
+    contentType: item.contentType || "",
+    videoId: item.videoId || "",
+    playlistId: item.playlistId || "",
+    postId: item.postId || "",
+    title: item.title || "",
+    text: item.text || "",
+    duration: item.duration || "",
+    published: item.published || "",
+    author: item.author || "",
+    authorId: item.authorId || "",
+    viewCount: firstNonEmpty(item.viewCount, item.views),
+    videoCount: item.videoCount || "",
+    voteCount: item.voteCount || "",
+    commentCount: item.commentCount || "",
+    description: item.description || "",
+    thumbnail: item.thumbnail || "",
+    thumbnailUrl: item.thumbnailUrl || "",
+    icon: item.icon || "",
+    iconUrl: item.iconUrl || "",
+    url: item.url || "",
+    isLive: item.isLive === true,
+    isUpcoming: item.isUpcoming === true,
+    streamStatus: item.streamStatus || "",
+    badges: asArray(item.badges).filter(Boolean),
+    metadataRows: asArray(item.metadataRows)
+      .map((row) => asArray(row).filter(Boolean))
+      .filter((row) => row.length),
+    attachment: normalizeChannelAttachment(item.attachment),
+  };
+
+  return normalized;
+}
+
+function validChannelItem(item) {
+  return Boolean(
+    item &&
+      (item.videoId || item.playlistId || item.postId || item.title || item.text)
+  );
+}
+
+function normalizeChannelItems(items) {
+  return asArray(items)
+    .map(normalizeChannelItem)
+    .filter(validChannelItem);
+}
+
 export function normalizePlaylist(data, requestedId = "") {
   if (!data || typeof data !== "object") return null;
   return {
@@ -135,14 +201,42 @@ export function normalizePlaylist(data, requestedId = "") {
 
 export function normalizeChannel(data) {
   if (!data || typeof data !== "object") return null;
+
+  const playlists = asArray(data.playlists).map((playlist) => ({
+    ...playlist,
+    title: playlist?.title || "",
+    type: playlist?.type || "videos",
+    browseId: playlist?.browseId || "",
+    playlistId: playlist?.playlistId || "",
+    items: normalizeChannelItems(playlist?.items),
+  }));
+
+  const sections = asArray(data.sections).length
+    ? asArray(data.sections).map((section) => ({
+        ...section,
+        title: section?.title || "コンテンツ",
+        type: section?.type || "mixed",
+        browseId: section?.browseId || "",
+        playlistId: section?.playlistId || "",
+        items: normalizeChannelItems(section?.items),
+      }))
+    : playlists.map((playlist) => ({ ...playlist }));
+
   return {
     ...data,
-    playlists: asArray(data.playlists).map((playlist) => ({
-      ...playlist,
-      items: asArray(playlist?.items)
-        .map(normalizePlaylistItem)
-        .filter((item) => item?.videoId),
-    })),
+    channelId: data.channelId || "",
+    title: data.title || "",
+    avatar: data.avatar || "",
+    banner: data.banner || "",
+    videoCount: data.videoCount || "",
+    description: data.description || "",
+    uploadsPlaylistId: data.uploadsPlaylistId || "",
+    topVideo: normalizeChannelItem(data.topVideo),
+    playlists,
+    sections,
+    posts: normalizeChannelItems(data.posts),
+    live: normalizeChannelItems(data.live),
+    shorts: normalizeChannelItems(data.shorts),
   };
 }
 

@@ -61,6 +61,72 @@ test("channel normalization drops malformed empty video cards", () => {
   assert.equal(channel.playlists[0].items[0].title, "Valid");
 });
 
+test("channel normalization preserves the expanded channel response", () => {
+  const channel = normalizeChannel({
+    channelId: "UC123",
+    title: "Expanded channel",
+    uploadsPlaylistId: "UU123",
+    topVideo: {
+      type: "video",
+      videoId: "topvideo123",
+      thumbnailUrl: "https://img.example/top.jpg",
+      badges: ["4K"],
+      metadataRows: [["1万回視聴", "1日前"]],
+    },
+    sections: [
+      {
+        title: "ライブ",
+        type: "live",
+        browseId: "VLPL_LIVE",
+        playlistId: "PL_LIVE",
+        items: [{
+          type: "video",
+          videoId: "livevideo12",
+          isLive: true,
+          streamStatus: "live",
+          iconUrl: "https://img.example/icon.jpg",
+        }],
+      },
+    ],
+    posts: [{
+      type: "post",
+      postId: "post-1",
+      text: "投票してください",
+      voteCount: "20",
+      commentCount: "3",
+      attachment: {
+        type: "poll",
+        choices: ["A", "B"],
+        images: ["https://img.example/post.jpg"],
+        totalVotes: "100票",
+      },
+    }],
+    shorts: [{ type: "short", videoId: "shortvideo1" }],
+  });
+
+  assert.equal(channel.sections[0].type, "live");
+  assert.equal(channel.sections[0].items[0].isLive, true);
+  assert.equal(channel.topVideo.badges[0], "4K");
+  assert.deepEqual(channel.topVideo.metadataRows[0], ["1万回視聴", "1日前"]);
+  assert.equal(channel.posts[0].attachment.type, "poll");
+  assert.deepEqual(channel.posts[0].attachment.choices, ["A", "B"]);
+  assert.equal(channel.shorts[0].type, "short");
+});
+
+test("channel normalization derives sections from the legacy playlists shape", () => {
+  const channel = normalizeChannel({
+    playlists: [{
+      title: "アップロード",
+      playlistId: "UU123",
+      items: [{ videoId: "abcdefghijk", title: "Video" }],
+    }],
+  });
+
+  assert.equal(channel.sections.length, 1);
+  assert.equal(channel.sections[0].playlistId, "UU123");
+  assert.equal(channel.sections[0].items[0].type, "video");
+});
+
 test("stream normalization supports muxed playback, HLS fallback, and VTT captions", () => {
   const data = {
     streams: {
