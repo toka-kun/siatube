@@ -71,6 +71,26 @@ test("same-video stream requests share one in-flight API call and cache", async 
   assert.deepEqual(second, third);
 });
 
+test("stream appends the requested ps query parameter", async (t) => {
+  clearStreamCache();
+  const originalFetch = globalThis.fetch;
+  let requestedUrl = "";
+  globalThis.fetch = async (url) => {
+    requestedUrl = String(url);
+    return jsonResponse({ streams: { muxed: [] } });
+  };
+  t.after(() => {
+    clearStreamCache();
+    globalThis.fetch = originalFetch;
+  });
+
+  await stream("dQw4w9WgXcQ", { ps: "siatube" });
+
+  const url = new URL(requestedUrl);
+  assert.equal(url.pathname, "/api/stream/dQw4w9WgXcQ");
+  assert.equal(url.search, "?ps=siatube");
+});
+
 test("Apps Script deployments call SiaTube directly", async (t) => {
   const originalWindow = globalThis.window;
   const originalFetch = globalThis.fetch;

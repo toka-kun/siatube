@@ -451,27 +451,31 @@ export function stream(videoId, options = {}) {
   }
   if (options.signal?.aborted) return Promise.reject(abortError(options.signal));
 
+  const ps = options.ps === undefined ? "" : requireString(options.ps, "ps");
+  const cacheKey = `${id}\u0000${ps}`;
+
   const now = Date.now();
   pruneStreamCache(now);
-  const cached = streamCache.get(id);
+  const cached = streamCache.get(cacheKey);
   if (!options.forceRefresh && cached && now - cached.createdAt < STREAM_CACHE_TTL_MS) {
     return withSignal(Promise.resolve(cached.data), options.signal);
   }
-  if (cached) streamCache.delete(id);
+  if (cached) streamCache.delete(cacheKey);
 
-  let pending = streamRequests.get(id);
+  let pending = streamRequests.get(cacheKey);
   if (!pending) {
     pending = getJson(`/api/stream/${pathSegment(id, "videoId")}`, {
       ...requestOptions({ ...options, signal: undefined }),
+      query: { ps: ps || undefined },
     })
       .then((data) => {
-        streamCache.set(id, { createdAt: Date.now(), data });
+        streamCache.set(cacheKey, { createdAt: Date.now(), data });
         return data;
       })
       .finally(() => {
-        streamRequests.delete(id);
+        streamRequests.delete(cacheKey);
       });
-    streamRequests.set(id, pending);
+    streamRequests.set(cacheKey, pending);
   }
 
   return withSignal(pending, options.signal);
@@ -482,7 +486,10 @@ export function clearStreamCache(videoId) {
     streamCache.clear();
     return;
   }
-  streamCache.delete(requireString(videoId, "videoId"));
+  const id = requireString(videoId, "videoId");
+  for (const key of streamCache.keys()) {
+    if (key.startsWith(`${id}\u0000`)) streamCache.delete(key);
+  }
 }
 
 export {

@@ -1037,6 +1037,7 @@ async function fetchStreamUrl(id, forceRefresh = false) {
   try {
     const data = await fetchStream(id, {
       forceRefresh,
+      ps: "siatube",
       retries: 1,
       timeout: 30000,
     });
