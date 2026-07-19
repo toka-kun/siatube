@@ -115,3 +115,37 @@ test("Apps Script deployments call SiaTube directly", async (t) => {
     "https://siatube.com/api/suggest/?keyword=%E7%8C%AB",
   );
 });
+
+test("configured proxy wraps SiaTube GET requests without changing the method", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalLocalStorage = globalThis.localStorage;
+  const values = new Map([
+    ["requestProxyUrl", JSON.stringify("https://proxy.test/forward")],
+  ]);
+  let requestedUrl = "";
+  let requestedOptions = null;
+
+  globalThis.localStorage = {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+  };
+  globalThis.fetch = async (url, options) => {
+    requestedUrl = String(url);
+    requestedOptions = options;
+    return jsonResponse({ items: [] });
+  };
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    if (originalLocalStorage === undefined) delete globalThis.localStorage;
+    else globalThis.localStorage = originalLocalStorage;
+  });
+
+  await search("proxy test", { retries: 0 });
+
+  const target = "https://siatube.com/api/search?q=proxy+test";
+  assert.equal(
+    requestedUrl,
+    `https://proxy.test/forward?url=${encodeURIComponent(target)}`,
+  );
+  assert.equal(requestedOptions.method, "GET");
+});

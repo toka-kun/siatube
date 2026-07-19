@@ -16,7 +16,82 @@
       </div>
 
       <!-- コンテンツ -->
+
       <div class="settings-modal-content">
+
+
+        <!-- リクエストプロキシ -->
+        <section class="settings-section">
+          <h3>リクエストプロキシ</h3>
+          <label :for="requestProxyInputId" class="proxy-url-label">
+            プロキシURL:
+            <input
+              :id="requestProxyInputId"
+              type="url"
+              class="proxy-url-input"
+              :value="requestProxyUrl"
+              placeholder="https://proxy.example.com/"
+              autocomplete="off"
+              spellcheck="false"
+              :aria-invalid="requestProxyUrlError ? 'true' : 'false'"
+              :aria-describedby="requestProxyUrlError
+                ? `${requestProxyHelpId} ${requestProxyErrorId}`
+                : requestProxyHelpId"
+              @input="handleRequestProxyUrlChange($event.target.value)"
+              @change="handleRequestProxyUrlCommit($event.target.value)"
+              @keydown.enter="$event.target.blur()"
+            />
+          </label>
+          <small :id="requestProxyHelpId" class="proxy-url-help">
+            API通信がプロキシ経由になります。<br>空欄の場合はプロキシされません。
+          </small>
+          <small
+            v-if="requestProxyUrlError"
+            :id="requestProxyErrorId"
+            class="setting-error"
+            role="alert"
+          >
+            {{ requestProxyUrlError }}
+          </small>
+          <div
+            v-if="requestProxyCheckStatus === 'checking'"
+            class="proxy-check-status proxy-check-status-checking"
+            role="status"
+            aria-live="polite"
+          >
+            <span class="proxy-check-spinner" aria-hidden="true"></span>
+            <span>プロキシを確認しています…</span>
+          </div>
+          <div
+            v-else-if="requestProxyCheckStatus === 'success'"
+            class="proxy-check-status proxy-check-status-success"
+            role="status"
+            aria-live="polite"
+            tabindex="0"
+            :aria-describedby="requestProxyStatusTooltipId"
+          >
+            <span class="proxy-check-icon" aria-hidden="true">✓</span>
+            <strong>プロキシが有効です</strong>
+            <span class="proxy-check-info" aria-hidden="true">ⓘ</span>
+            <span
+              :id="requestProxyStatusTooltipId"
+              class="proxy-check-tooltip"
+              role="tooltip"
+            >
+              {{ requestProxySuccessDescription }}
+            </span>
+          </div>
+          <div
+            v-else-if="requestProxyCheckStatus === 'error'"
+            class="proxy-check-status proxy-check-status-error"
+            role="status"
+            aria-live="polite"
+          >
+            <span class="proxy-check-icon" aria-hidden="true">!</span>
+            <span>プロキシを確認できませんでした</span>
+          </div>
+        </section>
+
         <!-- デフォルト再生方式 -->
         <section class="settings-section">
           <h3>デフォルト再生方式</h3>
@@ -34,7 +109,7 @@
               :checked="defaultPlaybackMode === '2'"
               @change="handlePlaybackModeChange('2')"
             />
-            タイプ２</label
+            タイプ２(ストリームurl)</label
           >
         </section>
 
@@ -141,7 +216,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted, inject, watch, computed } from "vue";
+import {
+  ref,
+  onMounted,
+  onBeforeUnmount,
+  inject,
+  watch,
+  computed,
+  useId,
+} from "vue";
 import {
   loadDefaultPlayback,
   saveDefaultPlayback,
@@ -155,9 +238,23 @@ import {
   loadPreferredQuality,
   savePreferredQuality,
 } from "@/utils/settingsManager";
+import {
+  checkRequestProxy,
+  loadRequestProxy,
+  normalizeRequestProxyUrl,
+  saveRequestProxy,
+} from "@/utils/requestProxy";
 
 // 設定モーダルの状態
 const settingsModal = inject("settingsModal", {});
+const settingsViewId = useId();
+const requestProxyInputId = `${settingsViewId}-request-proxy-url`;
+const requestProxyHelpId = `${settingsViewId}-request-proxy-help`;
+const requestProxyErrorId = `${settingsViewId}-request-proxy-error`;
+const requestProxyStatusTooltipId = `${settingsViewId}-request-proxy-status-tooltip`;
+const requestProxySuccessDescription =
+  "プロキシを経由して、正しくしあtubeサーバーに接続ができ有効なレスポンスが返って来ました来ました";
+const REQUEST_PROXY_CHECK_TIMEOUT_MS = 15_000;
 
 // Settings state
 const defaultPlaybackMode = ref("1");
@@ -166,6 +263,12 @@ const shortVideoFilterMinutes = ref(4);
 const displayMode = ref("device");
 const disableTimeouts = ref(true);
 const preferredQuality = ref("auto");
+const requestProxyUrl = ref("");
+const requestProxyCheckStatus = ref("idle");
+let checkedRequestProxyUrl = "";
+let requestProxyCheckSequence = 0;
+let requestProxyCheckController = null;
+let requestProxyCheckTimeoutId = null;
 const preferredQualityOptions = [
   "auto",
   "2160p",
@@ -232,9 +335,26 @@ const modalIsOpen = computed(() => {
   }
 });
 
+const requestProxyUrlError = computed(() => {
+  if (!requestProxyUrl.value.trim()) return "";
+  try {
+    normalizeRequestProxyUrl(requestProxyUrl.value);
+    return "";
+  } catch {
+    return "http:// または https:// で始まり、認証情報・クエリ・ハッシュを含まないURLを入力してください。この値はまだ適用されていません。";
+  }
+});
+
 // モーダルを開いた時点の状態をバックアップ
 watch(modalIsOpen, (open) => {
-  if (open) saveBackup();
+  if (open) {
+    const savedProxyUrl = loadRequestProxy().url;
+    if (checkedRequestProxyUrl && checkedRequestProxyUrl !== savedProxyUrl) {
+      resetRequestProxyCheck();
+    }
+    requestProxyUrl.value = savedProxyUrl;
+    saveBackup();
+  }
 });
 
 // Watch displayMode so changes from elsewhere also apply immediately
@@ -245,6 +365,8 @@ watch(displayMode, (v) => {
 });
 
 const loadSettings = () => {
+  requestProxyUrl.value = loadRequestProxy().url;
+
   // First try to load from localStorage
   try {
     const savedSettings = loadFromLocalStorage();
@@ -296,6 +418,7 @@ const saveBackup = () => {
     shortVideoFilterMinutes: shortVideoFilterMinutes.value,
     displayMode: displayMode.value,
     preferredQuality: preferredQuality.value,
+    requestProxyUrl: requestProxyUrl.value,
   };
 };
 
@@ -354,6 +477,91 @@ const handleDisableTimeoutsChange = (enabled) => {
     saveDisableTimeouts(!!enabled);
   } catch (e) {}
 };
+
+const handleRequestProxyUrlChange = (url) => {
+  requestProxyUrl.value = url;
+  try {
+    const normalizedProxyUrl = saveRequestProxy(url);
+    if (normalizedProxyUrl !== checkedRequestProxyUrl) {
+      resetRequestProxyCheck();
+    }
+  } catch {
+    // Keep showing the draft, but continue using the last valid saved URL.
+    resetRequestProxyCheck();
+  }
+};
+
+const clearRequestProxyCheckResources = () => {
+  if (requestProxyCheckTimeoutId !== null) {
+    clearTimeout(requestProxyCheckTimeoutId);
+    requestProxyCheckTimeoutId = null;
+  }
+  if (requestProxyCheckController) {
+    requestProxyCheckController.abort();
+    requestProxyCheckController = null;
+  }
+};
+
+const resetRequestProxyCheck = () => {
+  requestProxyCheckSequence += 1;
+  clearRequestProxyCheckResources();
+  checkedRequestProxyUrl = "";
+  requestProxyCheckStatus.value = "idle";
+};
+
+const runRequestProxyCheck = async (proxyUrl) => {
+  resetRequestProxyCheck();
+  checkedRequestProxyUrl = proxyUrl;
+  requestProxyCheckStatus.value = "checking";
+
+  const sequence = requestProxyCheckSequence;
+  const controller = new AbortController();
+  requestProxyCheckController = controller;
+  requestProxyCheckTimeoutId = setTimeout(() => {
+    controller.abort();
+  }, REQUEST_PROXY_CHECK_TIMEOUT_MS);
+
+  try {
+    await checkRequestProxy(proxyUrl, { signal: controller.signal });
+    if (sequence !== requestProxyCheckSequence) return;
+    requestProxyCheckStatus.value = "success";
+  } catch {
+    if (sequence !== requestProxyCheckSequence) return;
+    requestProxyCheckStatus.value = "error";
+  } finally {
+    if (sequence === requestProxyCheckSequence) {
+      clearRequestProxyCheckResources();
+    }
+  }
+};
+
+const handleRequestProxyUrlCommit = (url) => {
+  requestProxyUrl.value = url;
+  let normalizedProxyUrl;
+  try {
+    normalizedProxyUrl = saveRequestProxy(url);
+  } catch {
+    resetRequestProxyCheck();
+    return;
+  }
+
+  if (!normalizedProxyUrl) {
+    resetRequestProxyCheck();
+    return;
+  }
+  if (
+    checkedRequestProxyUrl === normalizedProxyUrl &&
+    requestProxyCheckStatus.value !== "idle"
+  ) {
+    return;
+  }
+
+  runRequestProxyCheck(normalizedProxyUrl);
+};
+
+onBeforeUnmount(() => {
+  resetRequestProxyCheck();
+});
 
 // localStorage関連の関数
 const saveToLocalStorage = () => {
@@ -501,6 +709,185 @@ const clearLocalStorage = () => {
   margin: 0 0 12px 0;
   font-size: 1rem;
   color: var(--text-primary);
+}
+
+.settings-section input.proxy-url-input {
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 6px;
+  margin-right: 0;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  cursor: text;
+}
+
+.settings-section input.proxy-url-input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.setting-error {
+  display: block;
+  margin-top: 8px;
+  color: var(--danger);
+}
+
+.proxy-check-status {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 12px;
+  padding: 9px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
+.proxy-check-status-checking {
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border-color: var(--border-color);
+}
+
+.proxy-check-status-success {
+  color: #17652b;
+  background: rgba(42, 138, 42, 0.12);
+  border-color: #17652b;
+  cursor: help;
+}
+
+.proxy-check-status-success:focus-visible {
+  outline: 2px solid #17652b;
+  outline-offset: 2px;
+}
+
+.proxy-check-status-error {
+  color: var(--danger);
+  background: rgba(204, 0, 0, 0.08);
+  border-color: var(--danger);
+}
+
+.proxy-check-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: var(--on-accent);
+  background: #17652b;
+  font-size: 0;
+}
+
+.proxy-check-icon::after {
+  color: var(--on-accent);
+  font-size: 14px;
+  font-weight: 800;
+  content: "✓";
+}
+
+.proxy-check-status-error .proxy-check-icon::after {
+  content: "!";
+}
+
+.proxy-check-status-error .proxy-check-icon {
+  background: var(--danger);
+}
+
+.proxy-check-spinner {
+  box-sizing: border-box;
+  width: 19px;
+  height: 19px;
+  border: 2px solid var(--border-color);
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: proxyCheckSpin 0.8s linear infinite;
+}
+
+.proxy-check-info {
+  flex: 0 0 auto;
+  margin-left: 2px;
+  font-size: 0.95rem;
+  opacity: 0.85;
+}
+
+.proxy-check-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 20;
+  box-sizing: border-box;
+  width: min(290px, calc(100vw - 56px));
+  padding: 10px 12px;
+  border-radius: 6px;
+  color: #fff;
+  background: var(--ui-dark);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  font-size: 0.78rem;
+  font-weight: 400;
+  line-height: 1.55;
+  text-align: left;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(4px);
+  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s ease;
+  pointer-events: none;
+}
+
+.proxy-check-status-success:hover .proxy-check-tooltip,
+.proxy-check-status-success:focus .proxy-check-tooltip,
+.proxy-check-status-success:focus-within .proxy-check-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.proxy-url-help {
+  display: block;
+}
+
+:global(html.dark-mode) .proxy-check-status-success {
+  color: #91e59e;
+  background: rgba(77, 180, 92, 0.14);
+  border-color: #91e59e;
+}
+
+:global(html.dark-mode) .proxy-check-status-success:focus-visible {
+  outline-color: #91e59e;
+}
+
+:global(html.dark-mode) .proxy-check-status-error {
+  color: var(--danger-weak);
+  background: rgba(255, 102, 102, 0.12);
+  border-color: var(--danger-weak);
+}
+
+@keyframes proxyCheckSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .proxy-check-spinner {
+    animation: none;
+  }
+
+  .proxy-check-tooltip {
+    transition: none;
+  }
+}
+
+:global(html.dark-mode) .setting-error {
+  color: var(--danger-weak);
 }
 
 .mode-group label,

@@ -1,3 +1,5 @@
+import { proxiedRequestUrl } from './requestProxy.js';
+
 const STORAGE_KEY = 'subscriptions_v1';
 
 function safeGet() {
@@ -62,7 +64,7 @@ export async function fetchImageAsBase64(url) {
     if (typeof url === 'string' && url.startsWith('data:')) return url;
     // Only attempt to fetch http/https URLs
     if (typeof url !== 'string' || (!url.startsWith('http://') && !url.startsWith('https://'))) return null;
-    const res = await fetch(url);
+    const res = await fetch(proxiedRequestUrl(url));
     if (!res.ok) return null;
     const blob = await res.blob();
     return await new Promise((resolve) => {

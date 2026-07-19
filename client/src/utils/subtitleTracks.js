@@ -1,3 +1,5 @@
+import { proxiedRequestUrl } from "./requestProxy.js";
+
 export function selectPlaybackSubtitleTracks(tracks, automaticLimit = 5) {
   const list = Array.isArray(tracks) ? tracks : [];
   const manual = list.filter((track) => track?.automatic !== true);
@@ -11,7 +13,7 @@ export async function localizeSubtitleTracks(tracks) {
   const localized = await Promise.all(
     (Array.isArray(tracks) ? tracks : []).map(async (track) => {
       try {
-        const response = await fetch(track.src, {
+        const response = await fetch(proxiedRequestUrl(track.src), {
           headers: { Accept: "text/vtt,text/plain;q=0.9" },
           credentials: "omit",
         });

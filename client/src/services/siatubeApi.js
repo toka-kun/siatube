@@ -1,5 +1,6 @@
 import { SIATUBE_API_ORIGIN } from "../api.js";
 import { loadDisableTimeouts } from "../utils/settingsManager.js";
+import { proxiedRequestUrl } from "../utils/requestProxy.js";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_RETRIES = 1;
@@ -222,7 +223,7 @@ function validatePayload(payload, response, url) {
 }
 
 function performGet(url, options) {
-  return fetch(url, options);
+  return fetch(proxiedRequestUrl(url), options);
 }
 
 function delay(ms, signal) {
