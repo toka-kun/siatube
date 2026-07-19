@@ -12,6 +12,9 @@
         :autoplay="autoplayEnabled"
         :loop="repeatEnabled"
         :key="sources[selectedQuality]?.url"
+        @canplay="markPlayerReady"
+        @playing="markPlayerPlaying"
+        @waiting="markPlayerBuffering"
       >
         <source
           v-for="s in getSingleStreamSources(sources[selectedQuality])"
@@ -72,7 +75,15 @@
     <template v-else>
       <template v-if="isAudioOnlyEntry(sources[selectedQuality])">
         <div class="audio-only">
-          <audio ref="audioRef" preload="auto" :autoplay="autoplayEnabled" controls>
+          <audio
+            ref="audioRef"
+            preload="auto"
+            :autoplay="autoplayEnabled"
+            controls
+            @canplay="markPlayerReady"
+            @playing="markPlayerPlaying"
+            @waiting="markPlayerBuffering"
+          >
             <source :src="sources[selectedQuality]?.audio?.url" :type="sources[selectedQuality]?.audio?.mimeType" />
           </audio>
         </div>
@@ -84,6 +95,9 @@
           :autoplay="autoplayEnabled"
           controls
           :key="separateAvKey"
+          @canplay="markPlayerReady"
+          @playing="markPlayerPlaying"
+          @waiting="markPlayerBuffering"
         >
           <source
             v-for="s in getVideoSourcesForEntry(sources[selectedQuality])"
@@ -104,7 +118,16 @@
         <div v-if="showUnmutePrompt" class="unmute-prompt" @click.stop="handleUnmuteClick">
           ミュートを解除する
         </div>
-        <audio ref="audioRef" preload="auto" style="display:none;" autoplay :key="separateAvKey">
+        <audio
+          ref="audioRef"
+          preload="auto"
+          style="display:none;"
+          autoplay
+          :key="separateAvKey"
+          @canplay="markPlayerReady"
+          @playing="markPlayerPlaying"
+          @waiting="markPlayerBuffering"
+        >
           <source :src="sources[selectedQuality]?.audio?.url" :type="sources[selectedQuality]?.audio?.mimeType" />
         </audio>
       </template>
@@ -142,12 +165,17 @@
       </div>
       <div v-if="isQualitySwitching" class="block-overlay" aria-hidden="true"></div>
     </template>
+    <PlayerLoading
+      v-if="!playerReady || playerBuffering"
+      overlay
+    />
   </div>
-  <div v-else-if="loading" style="height: 50px">読み込み中...</div>
+  <PlayerLoading v-else-if="loading" />
 </template>
 
 <script setup>
 import { ref, watch, onMounted, nextTick, onBeforeUnmount } from "vue";
+import PlayerLoading from "@/components/PlayerLoading.vue";
 import { stream as fetchStream } from "@/services/siatubeApi";
 import { setupSyncPlayback } from "@/components/syncPlayback";
 import { parseStream2Response } from "@/utils/type2StreamParser";
@@ -203,6 +231,8 @@ function saveAutoplaySetting(val) {
 
 const autoplayEnabled = ref(loadAutoplaySetting());
 const loading = ref(false);
+const playerReady = ref(false);
+const playerBuffering = ref(false);
 const isQualitySwitching = ref(false);
 const showUnmutePrompt = ref(false);
 const settingsVisible = ref(true);
@@ -840,6 +870,8 @@ function applyHlsSetup(prevTime = 0) {
 
 // selectedQuality の監視: 選択先が HLS(url) を持つかどうかで挙動を分ける
 watch(selectedQuality, () => {
+  playerReady.value = false;
+  playerBuffering.value = false;
   const sel = selectedQuality.value;
   const entry = sources.value[sel];
 
@@ -996,6 +1028,8 @@ async function fetchStreamUrl(id, forceRefresh = false) {
   diffText.value = "0";
   availableQualities.value = [];
   loading.value = true;
+  playerReady.value = false;
+  playerBuffering.value = false;
   hasM3u8.value = false;
   revokeSubtitleTracks(subtitleTracks.value);
   subtitleTracks.value = [];
@@ -1174,6 +1208,20 @@ async function fetchStreamUrl(id, forceRefresh = false) {
   } finally {
     if (sequence === streamRequestSequence) loading.value = false;
   }
+}
+
+function markPlayerReady() {
+  playerReady.value = true;
+  playerBuffering.value = false;
+}
+
+function markPlayerPlaying() {
+  playerReady.value = true;
+  playerBuffering.value = false;
+}
+
+function markPlayerBuffering() {
+  if (playerReady.value) playerBuffering.value = true;
 }
 
 watch(

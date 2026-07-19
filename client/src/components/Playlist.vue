@@ -100,11 +100,11 @@
           </div>
         </router-link>
       </div>
-    </div>
-    <div v-if="nextToken" class="playlist-more">
-      <button type="button" class="load-more-btn" :disabled="loadingMore" @click="loadMore">
-        {{ loadingMore ? "さらに読み込み中…" : "動画をさらに表示" }}
-      </button>
+      <div v-if="nextToken" class="playlist-more">
+        <button type="button" class="load-more-btn" :disabled="loadingMore" @click="loadMore">
+          {{ loadingMore ? "さらに読み込み中…" : "動画をさらに表示" }}
+        </button>
+      </div>
     </div>
   </section>
 
@@ -264,11 +264,11 @@ function loadMore() {
   loadPlaylist({ append: true });
 }
 
-watch(
-  () => `${playlistId.value}:${playlistId.value.startsWith("RD") ? route.query.v || "" : ""}`,
-  () => loadPlaylist(),
-  { immediate: true }
-);
+watch(playlistId, () => loadPlaylist(), { immediate: true });
+
+watch(playVideoId, (newVideoId, oldVideoId) => {
+  if (newVideoId && newVideoId !== oldVideoId) scrollToCurrentVideo();
+});
 
 function getPrimaryThumbnail(id) {
   return `https://i.ytimg.com/vi/${id}/sddefault.jpg`;
@@ -301,6 +301,15 @@ function onImageError(event, id) {
   display: flex;
   justify-content: center;
   padding: 12px 0 4px;
+}
+
+.scroll-default .playlist-more,
+.scroll-channel .playlist-more {
+  grid-column: 1 / -1;
+}
+
+.scroll-watch .playlist-more {
+  flex: 0 0 auto;
 }
 
 .load-more-btn {
@@ -348,6 +357,7 @@ function onImageError(event, id) {
 }
 
 .scroll-watch {
+  padding-top: 3em;
   display: flex;
   flex-direction: column;
   overflow-y: auto;

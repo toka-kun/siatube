@@ -76,10 +76,10 @@ function siatubeApiGet(pathAndQuery) {
   </li>
   <li>
     <img src="https://www.line.me/static/img/apple-touch-icon-57x57.png" alt="LINE" width="16" height="16" style="vertical-align: middle; margin-right: 4px;">
-    <a href="https://line.me/ti/g2/vCj1dWEoRZTALbC0n1w53si3-KJ8OTXnfjV6aw?utm_source=invitation&utm_medium=link_copy&utm_campaign=default" target="_blank">LINEオープンチャット</a>
+    <a href="https://line.me/ti/g2/PT62G9W_N5WOkD7VECW3tftJlCn2KTJIVt6k7g" target="_blank">LINEオープンチャット</a>
   </li>
   <li>
     <img src="https://assets.chatwork.com/images/favicon/favicon00.ico" alt="Chatwork" width="16" height="16" style="vertical-align: middle; margin-right: 4px;">
-    <a href="https://www.chatwork.com/g/siawaseok-_-" target="_blank">Chatwork</a>
+    <a href="https://www.chatwork.com/g/siatube" target="_blank">Chatwork</a>
   </li>
 </ul>

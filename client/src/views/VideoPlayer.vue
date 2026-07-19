@@ -1,7 +1,7 @@
 <template>
   <div class="page-container yt-watch-page">
     <div class="main-content" v-if="video">
-      <div class="video-wrapper">
+      <div class="main-video-wrapper">
         <StreamPlayer
           :videoId="videoId"
           :videoTitle="title"
@@ -458,19 +458,50 @@
       <Comment :videoId="videoId" :commentToken="video?.Commenttoken || null" />
     </div>
 
+    <section v-else-if="!error" class="main-content watch-loading-state" aria-busy="true">
+      <div class="main-video-wrapper">
+        <PlayerLoading />
+      </div>
+      <div class="loading-video-details" aria-hidden="true">
+        <span class="watch-skeleton loading-title-line"></span>
+        <div class="loading-channel-row">
+          <span class="watch-skeleton loading-channel-avatar"></span>
+          <span class="watch-skeleton loading-channel-name"></span>
+          <span class="watch-skeleton loading-action"></span>
+        </div>
+        <span class="watch-skeleton loading-description-line"></span>
+      </div>
+    </section>
+
+    <section v-else class="main-content watch-error-state" role="alert">
+      <div class="video-error-player">
+        <span class="video-error-icon" aria-hidden="true">!</span>
+        <p>{{ error }}</p>
+        <button class="reload-btn" type="button" @click="reloadVideo">再取得</button>
+      </div>
+    </section>
+
     <RelatedList
-      v-if="relatedVideos.length"
+      v-if="playlistId || relatedVideos.length"
       :relatedVideos="relatedVideos"
       :playlistId="playlistId"
       :currentVideoId="videoId"
       :loadingMore="loadingMore"
       @load-more="loadMoreRelatedVideos"
     />
-    <div v-else-if="error" class="error-msg">
+    <div v-else-if="error && video" class="error-msg">
       ⚠️ {{ error }}<br />
       <button class="reload-btn" @click="reloadVideo">再取得</button>
     </div>
-    <p v-else class="loading-msg">読み込み中...</p>
+    <aside v-else-if="!error" class="related-section loading-related" aria-hidden="true">
+      <div v-for="index in 5" :key="index" class="loading-related-row">
+        <span class="watch-skeleton loading-related-thumb"></span>
+        <span class="loading-related-copy">
+          <span class="watch-skeleton"></span>
+          <span class="watch-skeleton short"></span>
+        </span>
+      </div>
+    </aside>
 
     <!-- 自動再生フィルタ通知 -->
     <AutoplayNotification
@@ -500,6 +531,7 @@ import { useRoute } from "vue-router";
 import { ref } from "vue";
 import PlaylistComponent from "@/components/Playlist.vue";
 import Comment from "@/components/Comment.vue";
+import PlayerLoading from "@/components/PlayerLoading.vue";
 import StreamPlayer from "@/components/StreamPlayer.vue";
 window.scrollTo(0, 0);
 
@@ -1464,6 +1496,128 @@ p {
   flex-wrap: wrap;
 }
 
+.main-video-wrapper {
+  overflow: hidden;
+  border-radius: 12px;
+  background: #000;
+}
+
+.watch-loading-state,
+.watch-error-state {
+  align-self: flex-start;
+}
+
+.loading-video-details {
+  padding-top: 18px;
+}
+
+.watch-skeleton {
+  display: block;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--bg-secondary);
+  animation: watch-skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+.loading-title-line {
+  width: min(72%, 620px);
+  height: 22px;
+}
+
+.loading-channel-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.loading-channel-avatar {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border-radius: 50%;
+}
+
+.loading-channel-name {
+  width: min(180px, 30%);
+}
+
+.loading-action {
+  width: 92px;
+  height: 36px;
+  margin-left: auto;
+}
+
+.loading-description-line {
+  width: 88%;
+  margin-top: 20px;
+}
+
+.video-error-player {
+  box-sizing: border-box;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  padding: 24px;
+  border-radius: 12px;
+  color: #fff;
+  background: #000;
+  text-align: center;
+}
+
+.video-error-player p {
+  max-width: 560px;
+  margin: 0;
+}
+
+.video-error-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 2px solid rgb(255 255 255 / 0.72);
+  border-radius: 50%;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.loading-related {
+  display: grid;
+  gap: 14px;
+}
+
+.loading-related-row {
+  display: flex;
+  gap: 12px;
+}
+
+.loading-related-thumb {
+  width: 168px;
+  height: 94.5px;
+  flex: 0 0 168px;
+  border-radius: 8px;
+}
+
+.loading-related-copy {
+  flex: 1;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding-top: 5px;
+}
+
+.loading-related-copy .short {
+  width: 68%;
+}
+
+@keyframes watch-skeleton-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
 .main-content {
   flex: 1 1 0;
   min-width: 0;
@@ -1680,6 +1834,18 @@ p {
   .duration-badge {
     font-size: 0.65rem;
     padding: 1px 2px;
+  }
+
+  .loading-related-thumb {
+    width: 140px;
+    height: 78.75px;
+    flex-basis: 140px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .watch-skeleton {
+    animation: none;
   }
 }
 </style>

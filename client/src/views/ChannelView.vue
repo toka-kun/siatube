@@ -81,8 +81,7 @@
 
             <div class="channel-meta">
               <span v-if="channel.videoCount" class="important-meta">{{ channel.videoCount }}</span>
-              <span>{{ homeItemCount }}件のコンテンツを取得</span>
-              <span v-if="channel.channelId">{{ channel.channelId }}</span>
+              <span v-if="channel.channelId">ID:{{ channel.channelId }}</span>
             </div>
 
             <div v-if="descriptionText" class="hero-description-wrap">
@@ -181,13 +180,44 @@
               </router-link>
             </div>
 
-            <div class="section-track" :class="section.type">
-              <ChannelContentCard
-                v-for="(item, itemIndex) in section.items"
-                :key="itemKey(item, itemIndex)"
-                :item="item"
-                :layout="sectionCardLayout(section)"
-              />
+            <div class="section-track-shell" :class="section.type">
+              <button
+                v-if="sectionCanScrollLeft(sectionKey(section, sectionIndex))"
+                type="button"
+                class="section-scroll-button scroll-left"
+                :aria-label="`${section.title}を左にスクロール`"
+                @click="scrollSection(sectionKey(section, sectionIndex), -1)"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m14.5 5-7 7 7 7" />
+                </svg>
+              </button>
+
+              <div
+                :ref="(element) => setSectionTrackRef(sectionKey(section, sectionIndex), element)"
+                class="section-track"
+                :class="section.type"
+                @scroll.passive="updateSectionScrollState(sectionKey(section, sectionIndex))"
+              >
+                <ChannelContentCard
+                  v-for="(item, itemIndex) in section.items"
+                  :key="itemKey(item, itemIndex)"
+                  :item="item"
+                  :layout="sectionCardLayout(section)"
+                />
+              </div>
+
+              <button
+                v-if="sectionCanScrollRight(sectionKey(section, sectionIndex))"
+                type="button"
+                class="section-scroll-button scroll-right"
+                :aria-label="`${section.title}を右にスクロール`"
+                @click="scrollSection(sectionKey(section, sectionIndex), 1)"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m9.5 5 7 7-7 7" />
+                </svg>
+              </button>
             </div>
           </section>
 
@@ -395,7 +425,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import ChannelContentCard from "@/components/ChannelContentCard.vue";
 import VideoList from "@/components/Playlist.vue";
@@ -416,7 +446,10 @@ const descriptionExpanded = ref(false);
 const avatarFailed = ref(false);
 const bannerFailed = ref(false);
 const featureImageFailed = ref(false);
+const sectionScrollState = reactive({});
+const sectionTrackElements = new Map();
 let channelRequestSequence = 0;
+let sectionTrackResizeObserver = null;
 
 const homeSections = computed(() =>
   (channel.value?.sections || []).filter((section) => section?.items?.length)
@@ -585,6 +618,61 @@ function sectionCardLayout(section) {
   return "shelf";
 }
 
+function setSectionTrackRef(key, element) {
+  const previousElement = sectionTrackElements.get(key);
+  if (previousElement === element) return;
+
+  if (previousElement) sectionTrackResizeObserver?.unobserve(previousElement);
+
+  if (!element) {
+    sectionTrackElements.delete(key);
+    delete sectionScrollState[key];
+    return;
+  }
+
+  sectionTrackElements.set(key, element);
+  sectionTrackResizeObserver?.observe(element);
+  nextTick(() => updateSectionScrollState(key));
+}
+
+function updateSectionScrollState(key) {
+  const element = sectionTrackElements.get(key);
+  if (!element) return;
+
+  const maxScrollLeft = Math.max(0, element.scrollWidth - element.clientWidth);
+  const scrollLeft = Math.max(0, element.scrollLeft);
+  const edgeTolerance = 2;
+  const canScrollLeft = scrollLeft > edgeTolerance;
+  const canScrollRight = maxScrollLeft - scrollLeft > edgeTolerance;
+  const currentState = sectionScrollState[key];
+
+  if (
+    currentState?.canScrollLeft === canScrollLeft &&
+    currentState?.canScrollRight === canScrollRight
+  ) return;
+
+  sectionScrollState[key] = { canScrollLeft, canScrollRight };
+}
+
+function sectionCanScrollLeft(key) {
+  return sectionScrollState[key]?.canScrollLeft === true;
+}
+
+function sectionCanScrollRight(key) {
+  return sectionScrollState[key]?.canScrollRight === true;
+}
+
+function scrollSection(key, direction) {
+  const element = sectionTrackElements.get(key);
+  if (!element) return;
+
+  const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+  element.scrollBy({
+    left: direction * element.clientWidth * 0.85,
+    behavior: prefersReducedMotion ? "auto" : "smooth",
+  });
+}
+
 function updateSubscribed() {
   subscribed.value = subscriptionManager.isSubscribed(effectiveId.value);
 }
@@ -686,6 +774,20 @@ function handleFeatureImageError(event) {
 }
 
 onMounted(() => {
+  if (typeof ResizeObserver !== "undefined") {
+    sectionTrackResizeObserver = new ResizeObserver((entries) => {
+      entries.forEach(({ target }) => {
+        for (const [key, element] of sectionTrackElements) {
+          if (element === target) {
+            updateSectionScrollState(key);
+            break;
+          }
+        }
+      });
+    });
+    sectionTrackElements.forEach((element) => sectionTrackResizeObserver.observe(element));
+  }
+
   fetchChannelInfo(effectiveId.value);
   updateSubscribed();
   window.addEventListener("subscriptions-changed", updateSubscribed);
@@ -714,6 +816,9 @@ watch(
 
 onUnmounted(() => {
   channelRequestSequence += 1;
+  sectionTrackResizeObserver?.disconnect();
+  sectionTrackResizeObserver = null;
+  sectionTrackElements.clear();
   window.removeEventListener("subscriptions-changed", updateSubscribed);
   window.removeEventListener("storage", handleSubscriptionStorage);
 });
@@ -1265,6 +1370,10 @@ onUnmounted(() => {
   text-decoration: underline;
 }
 
+.section-track-shell {
+  position: relative;
+}
+
 .section-track {
   display: flex;
   align-items: flex-start;
@@ -1273,6 +1382,62 @@ onUnmounted(() => {
   padding: 2px 2px 18px;
   scroll-snap-type: x proximity;
   scrollbar-color: var(--border-color) transparent;
+}
+
+.section-scroll-button {
+  position: absolute;
+  z-index: 4;
+  top: 80px;
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.2);
+  transform: translateY(-50%);
+  transition: background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.section-scroll-button:hover {
+  background: var(--hover-bg);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.26);
+  transform: translateY(-50%) scale(1.05);
+}
+
+.section-scroll-button:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+.section-scroll-button svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.2;
+}
+
+.section-scroll-button.scroll-left {
+  left: -18px;
+}
+
+.section-scroll-button.scroll-right {
+  right: -18px;
+}
+
+.section-track-shell.shorts .section-scroll-button {
+  top: 187px;
+}
+
+.section-track-shell.posts .section-scroll-button {
+  top: 50%;
 }
 
 .section-track > * {
@@ -1594,6 +1759,10 @@ td {
 }
 
 @media (max-width: 900px) {
+  .section-scroll-button {
+    display: none;
+  }
+
   .channel-shell {
     width: min(100% - 30px, 1440px);
   }
