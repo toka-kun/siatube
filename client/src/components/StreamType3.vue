@@ -156,7 +156,9 @@ async function fetchStream(forceRefresh = false) {
     streamData.value = data;
   } catch (e) {
     if (sequence !== requestSequence || id !== props.videoId) return;
-    error.value = "ストリームの取得に失敗しました（fetch error）";
+    error.value = e?.connectionFailure
+      ? e.message
+      : "ストリームの取得に失敗しました（fetch error）";
     streamData.value = null;
     muxed360pList.value = [];
     audioOnlyList.value = [];

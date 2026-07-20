@@ -96,7 +96,9 @@ async function fetchStream(id) {
       }
       return;
     } catch (err) {
-      if (err && err.name === "AbortError") {
+      if (err?.connectionFailure) {
+        error.value = err.message;
+      } else if (err && err.name === "AbortError") {
         error.value = "ストリームURLの取得に失敗しました (タイムアウト)";
       } else {
         error.value = "ストリームURLの取得に失敗しました (fetch error)";

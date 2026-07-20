@@ -1,6 +1,15 @@
 import { SIATUBE_API_ORIGIN } from "../api.js";
 import { loadDisableTimeouts } from "../utils/settingsManager.js";
-import { proxiedRequestUrl } from "../utils/requestProxy.js";
+import {
+  isRequestProxyLoadFailure,
+  loadRequestProxy,
+  loadRequestProxyJsonp,
+  proxiedRequestUrl,
+  recordRequestProxyLoadFailure,
+  recordRequestProxyLoadSuccess,
+  requestProxyJsonp,
+  requestProxyTransport,
+} from "../utils/requestProxy.js";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_RETRIES = 1;
@@ -29,6 +38,10 @@ export class SiaTubeApiError extends Error {
     this.payload = details.payload ?? null;
     this.unavailable = details.unavailable === true;
     this.retryable = details.retryable === true;
+    this.proxyUsed = details.proxyUsed === true;
+    this.proxyUrl = details.proxyUrl || null;
+    this.proxyTransport = details.proxyTransport || null;
+    this.connectionFailure = details.connectionFailure === true;
     if (details.cause !== undefined) this.cause = details.cause;
   }
 }
@@ -222,8 +235,59 @@ function validatePayload(payload, response, url) {
   return payload;
 }
 
-function performGet(url, options) {
-  return fetch(proxiedRequestUrl(url), options);
+async function performGet(url, options, proxyUrl, proxyTransport) {
+  if (proxyUrl && proxyTransport === "jsonp") {
+    const result = await requestProxyJsonp(url, {
+      proxyUrl,
+      signal: options.signal,
+    });
+    const status = Number(result.status);
+    const ok = result.ok === true && status >= 200 && status < 300;
+    const errorText = typeof result.error === "string" && result.error.trim()
+      ? result.error
+      : `JSONP proxy returned HTTP ${status}`;
+    const payload = result.ok
+      ? result.data
+      : { error: errorText };
+    return {
+      ok,
+      status,
+      json: async () => payload,
+    };
+  }
+  return fetch(proxiedRequestUrl(url, { url: proxyUrl }), options);
+}
+
+function finalizeRequestError(error, proxyUrl, proxyTransport) {
+  const finalError = error instanceof SiaTubeApiError
+    ? error
+    : new SiaTubeApiError("Failed to reach the SiaTube API", {
+      code: "NETWORK_ERROR",
+      cause: error,
+      retryable: true,
+    });
+  const proxyUsed = Boolean(proxyUrl);
+  finalError.proxyUsed = proxyUsed;
+  finalError.proxyUrl = proxyUsed ? proxyUrl : null;
+  finalError.proxyTransport = proxyUsed ? proxyTransport : null;
+  finalError.connectionFailure = isRequestProxyLoadFailure(finalError);
+
+  if (finalError.connectionFailure) {
+    finalError.originalMessage ||= finalError.message;
+    finalError.message = proxyUsed
+      ? proxyTransport === "jsonp"
+        ? "JSONPプロキシ経由でしあtubeサーバーに接続できませんでした。JSONPまたはプロキシ設定を確認してください。"
+        : "プロキシ経由でしあtubeサーバーに接続できませんでした。プロキシ設定またはネットワーク接続を確認してください。"
+      : "しあtubeサーバーに接続できませんでした。ネットワーク接続を確認してください。";
+  }
+
+  if (proxyUsed) {
+    void recordRequestProxyLoadFailure(proxyUrl, {
+      error: finalError,
+      transport: proxyTransport,
+    }).catch(() => {});
+  }
+  return finalError;
 }
 
 function delay(ms, signal) {
@@ -259,8 +323,14 @@ export async function getJson(path, options = {}) {
   } catch {}
   const retries = normalizeRetries(options.retries);
   const url = buildUrl(path, query).toString();
+  const proxyUrl = loadRequestProxy().url;
+  const proxyTransport = requestProxyTransport(
+    Boolean(proxyUrl) && loadRequestProxyJsonp(),
+  );
 
-  if (signal?.aborted) throw abortError(signal, url);
+  if (signal?.aborted) {
+    throw finalizeRequestError(abortError(signal, url), proxyUrl, proxyTransport);
+  }
 
   let lastError = null;
   for (let attempt = 0; attempt <= retries; attempt += 1) {
@@ -287,9 +357,13 @@ export async function getJson(path, options = {}) {
         credentials: "omit",
         redirect: "follow",
         signal: controller.signal,
-      });
+      }, proxyUrl, proxyTransport);
       const payload = await readJson(response, url);
-      return validatePayload(payload, response, url);
+      const result = validatePayload(payload, response, url);
+      if (proxyUrl) {
+        recordRequestProxyLoadSuccess(proxyUrl, { transport: proxyTransport });
+      }
+      return result;
     } catch (cause) {
       if (signal?.aborted) {
         lastError = abortError(signal, url);
@@ -297,6 +371,13 @@ export async function getJson(path, options = {}) {
         lastError = timeoutError(timeout, url, cause);
       } else if (cause instanceof SiaTubeApiError) {
         lastError = cause;
+      } else if (cause?.code === "INVALID_JSON") {
+        lastError = new SiaTubeApiError("SiaTube API returned invalid JSONP", {
+          code: "INVALID_JSON",
+          url,
+          cause,
+          retryable: true,
+        });
       } else {
         lastError = new SiaTubeApiError("Failed to reach the SiaTube API", {
           code: "NETWORK_ERROR",
@@ -310,14 +391,24 @@ export async function getJson(path, options = {}) {
       if (signal) signal.removeEventListener("abort", onExternalAbort);
     }
 
-    if (!lastError.retryable || attempt >= retries) throw lastError;
+    if (!lastError.retryable || attempt >= retries) {
+      throw finalizeRequestError(lastError, proxyUrl, proxyTransport);
+    }
     const retryDelay = lastError.status === 429
       ? RATE_LIMIT_RETRY_DELAY_MS
       : RETRY_DELAY_MS * (attempt + 1);
-    await delay(retryDelay, signal);
+    try {
+      await delay(retryDelay, signal);
+    } catch (cause) {
+      throw finalizeRequestError(cause, proxyUrl, proxyTransport);
+    }
   }
 
-  throw lastError || new SiaTubeApiError("SiaTube API request failed");
+  throw finalizeRequestError(
+    lastError || new SiaTubeApiError("SiaTube API request failed"),
+    proxyUrl,
+    proxyTransport,
+  );
 }
 
 export function search(input, options = {}) {

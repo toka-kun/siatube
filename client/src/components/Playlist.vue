@@ -1,6 +1,6 @@
 <template>
   <section v-if="error" class="error-message" style="color: var(--text-primary);">
-    プレイリストの取得に失敗しました。
+    {{ error }}
   </section>
 
   <section v-else-if="playlist" class="playlist-section" :class="`type-${displayType}`">
@@ -134,7 +134,7 @@ const route = useRoute();
 const playlist = ref(null);
 const loading = ref(false);
 const loadingMore = ref(false);
-const error = ref(false);
+const error = ref("");
 const scrollContainer = ref(null);
 const nextToken = ref(null);
 let requestSequence = 0;
@@ -206,7 +206,7 @@ async function scrollToCurrentVideo() {
 async function loadPlaylist({ append = false } = {}) {
   if (!playlistId.value) {
     console.error("playlistId が指定されていません");
-    error.value = true;
+    error.value = "プレイリストIDが指定されていません。";
     return;
   }
 
@@ -218,7 +218,7 @@ async function loadPlaylist({ append = false } = {}) {
     playlist.value = null;
     nextToken.value = null;
   }
-  error.value = false;
+  error.value = "";
 
   try {
     let data;
@@ -250,7 +250,11 @@ async function loadPlaylist({ append = false } = {}) {
   } catch (err) {
     if (sequence !== requestSequence) return;
     console.error("プレイリスト取得失敗:", err);
-    if (!append) error.value = true;
+    if (!append) {
+      error.value = err?.connectionFailure
+        ? err.message
+        : "プレイリストの取得に失敗しました。";
+    }
   } finally {
     if (sequence === requestSequence) {
       loading.value = false;

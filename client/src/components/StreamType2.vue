@@ -1198,7 +1198,9 @@ async function fetchStreamUrl(id, forceRefresh = false) {
   } catch (err) {
     if (sequence !== streamRequestSequence || id !== props.videoId) return;
     loading.value = false;
-    if (err && err.name === 'AbortError') {
+    if (err?.connectionFailure) {
+      error.value = err.message;
+    } else if (err && err.name === 'AbortError') {
       error.value = "ストリームURLの取得に失敗しました (タイムアウト)";
     } else {
       error.value = "ストリームURLの取得に失敗しました (fetch error)";

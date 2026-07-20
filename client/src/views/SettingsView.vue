@@ -53,6 +53,22 @@
           >
             {{ requestProxyUrlError }}
           </small>
+          <button
+            type="button"
+            class="proxy-jsonp-toggle"
+            :class="{ 'is-active': requestProxyJsonpEnabled }"
+            :aria-pressed="requestProxyJsonpEnabled ? 'true' : 'false'"
+            aria-label="JSONPを有効にする"
+            @click="handleRequestProxyJsonpToggle"
+          >
+            <span class="proxy-jsonp-indicator" aria-hidden="true">
+              {{ requestProxyJsonpEnabled ? "✓" : "" }}
+            </span>
+            <span>JSONPを有効にする</span>
+          </button>
+          <small v-if="requestProxyJsonpEnabled" class="proxy-jsonp-help">
+            JSONPが必要な場合に使用します。信頼できるプロキシのみ設定してください。
+          </small>
           <div
             v-if="requestProxyCheckStatus === 'checking'"
             class="proxy-check-status proxy-check-status-checking"
@@ -60,7 +76,9 @@
             aria-live="polite"
           >
             <span class="proxy-check-spinner" aria-hidden="true"></span>
-            <span>プロキシを確認しています…</span>
+            <span>{{ requestProxyJsonpEnabled
+              ? "JSONPプロキシを確認しています…"
+              : "プロキシを確認しています…" }}</span>
           </div>
           <div
             v-else-if="requestProxyCheckStatus === 'success'"
@@ -70,7 +88,7 @@
             tabindex="0"
             :aria-describedby="requestProxyStatusTooltipId"
           >
-            <span class="proxy-check-icon" aria-hidden="true">✓</span>
+            <span class="proxy-check-icon" aria-hidden="true">✔</span>
             <strong>プロキシが有効です</strong>
             <span class="proxy-check-info" aria-hidden="true">ⓘ</span>
             <span
@@ -88,7 +106,16 @@
             aria-live="polite"
           >
             <span class="proxy-check-icon" aria-hidden="true">!</span>
-            <span>プロキシを確認できませんでした</span>
+            <span>{{ requestProxyJsonpEnabled
+              ? "JSONPプロキシを確認できませんでした"
+              : "プロキシを確認できませんでした" }}</span>
+            <button
+              type="button"
+              class="proxy-check-retry"
+              @click="handleRequestProxyRetry"
+            >
+              再確認
+            </button>
           </div>
         </section>
 
@@ -239,10 +266,16 @@ import {
   savePreferredQuality,
 } from "@/utils/settingsManager";
 import {
-  checkRequestProxy,
+  ensureRequestProxyHealth,
   loadRequestProxy,
+  loadRequestProxyHealth,
+  loadRequestProxyJsonp,
   normalizeRequestProxyUrl,
+  REQUEST_PROXY_CONFIG_EVENT,
+  REQUEST_PROXY_HEALTH_EVENT,
+  requestProxyTransport,
   saveRequestProxy,
+  saveRequestProxyJsonp,
 } from "@/utils/requestProxy";
 
 // 設定モーダルの状態
@@ -254,7 +287,6 @@ const requestProxyErrorId = `${settingsViewId}-request-proxy-error`;
 const requestProxyStatusTooltipId = `${settingsViewId}-request-proxy-status-tooltip`;
 const requestProxySuccessDescription =
   "プロキシを経由して、正しくしあtubeサーバーに接続ができ有効なレスポンスが返って来ました来ました";
-const REQUEST_PROXY_CHECK_TIMEOUT_MS = 15_000;
 
 // Settings state
 const defaultPlaybackMode = ref("1");
@@ -264,11 +296,11 @@ const displayMode = ref("device");
 const disableTimeouts = ref(true);
 const preferredQuality = ref("auto");
 const requestProxyUrl = ref("");
+const requestProxyJsonpEnabled = ref(false);
 const requestProxyCheckStatus = ref("idle");
 let checkedRequestProxyUrl = "";
+let checkedRequestProxyTransport = "fetch";
 let requestProxyCheckSequence = 0;
-let requestProxyCheckController = null;
-let requestProxyCheckTimeoutId = null;
 const preferredQualityOptions = [
   "auto",
   "2160p",
@@ -294,6 +326,11 @@ const STORAGE_KEY = "youtube_settings";
 
 onMounted(() => {
   loadSettings();
+  if (typeof window !== "undefined") {
+    window.addEventListener(REQUEST_PROXY_HEALTH_EVENT, handleRequestProxyHealthEvent);
+    window.addEventListener(REQUEST_PROXY_CONFIG_EVENT, handleRequestProxyConfigEvent);
+  }
+  restoreRequestProxyCheck();
   // apply current display mode to document
   try {
     applyDisplayMode(displayMode.value);
@@ -349,10 +386,9 @@ const requestProxyUrlError = computed(() => {
 watch(modalIsOpen, (open) => {
   if (open) {
     const savedProxyUrl = loadRequestProxy().url;
-    if (checkedRequestProxyUrl && checkedRequestProxyUrl !== savedProxyUrl) {
-      resetRequestProxyCheck();
-    }
+    requestProxyJsonpEnabled.value = loadRequestProxyJsonp();
     requestProxyUrl.value = savedProxyUrl;
+    restoreRequestProxyCheck(savedProxyUrl);
     saveBackup();
   }
 });
@@ -366,6 +402,7 @@ watch(displayMode, (v) => {
 
 const loadSettings = () => {
   requestProxyUrl.value = loadRequestProxy().url;
+  requestProxyJsonpEnabled.value = loadRequestProxyJsonp();
 
   // First try to load from localStorage
   try {
@@ -419,6 +456,7 @@ const saveBackup = () => {
     displayMode: displayMode.value,
     preferredQuality: preferredQuality.value,
     requestProxyUrl: requestProxyUrl.value,
+    requestProxyJsonpEnabled: requestProxyJsonpEnabled.value,
   };
 };
 
@@ -482,7 +520,10 @@ const handleRequestProxyUrlChange = (url) => {
   requestProxyUrl.value = url;
   try {
     const normalizedProxyUrl = saveRequestProxy(url);
-    if (normalizedProxyUrl !== checkedRequestProxyUrl) {
+    if (
+      normalizedProxyUrl !== checkedRequestProxyUrl ||
+      currentRequestProxyTransport() !== checkedRequestProxyTransport
+    ) {
       resetRequestProxyCheck();
     }
   } catch {
@@ -491,48 +532,104 @@ const handleRequestProxyUrlChange = (url) => {
   }
 };
 
-const clearRequestProxyCheckResources = () => {
-  if (requestProxyCheckTimeoutId !== null) {
-    clearTimeout(requestProxyCheckTimeoutId);
-    requestProxyCheckTimeoutId = null;
-  }
-  if (requestProxyCheckController) {
-    requestProxyCheckController.abort();
-    requestProxyCheckController = null;
-  }
-};
-
 const resetRequestProxyCheck = () => {
   requestProxyCheckSequence += 1;
-  clearRequestProxyCheckResources();
   checkedRequestProxyUrl = "";
+  checkedRequestProxyTransport = "fetch";
   requestProxyCheckStatus.value = "idle";
 };
 
-const runRequestProxyCheck = async (proxyUrl) => {
+const currentRequestProxyTransport = () => requestProxyTransport(
+  requestProxyJsonpEnabled.value,
+);
+
+const currentDraftRequestProxyUrl = () => {
+  try {
+    return normalizeRequestProxyUrl(requestProxyUrl.value);
+  } catch {
+    return null;
+  }
+};
+
+const applyRequestProxyHealthState = (state) => {
+  if (!state || !["checking", "success", "error"].includes(state.status)) return false;
+  if (
+    state.url !== loadRequestProxy().url ||
+    state.url !== currentDraftRequestProxyUrl() ||
+    state.transport !== currentRequestProxyTransport()
+  ) {
+    return false;
+  }
+  checkedRequestProxyUrl = state.url;
+  checkedRequestProxyTransport = state.transport;
+  requestProxyCheckStatus.value = state.status;
+  return true;
+};
+
+const handleRequestProxyHealthEvent = (event) => {
+  applyRequestProxyHealthState(event?.detail);
+};
+
+const handleRequestProxyConfigEvent = () => {
+  const savedJsonpEnabled = loadRequestProxyJsonp();
+  if (savedJsonpEnabled === requestProxyJsonpEnabled.value) return;
+  requestProxyJsonpEnabled.value = savedJsonpEnabled;
+  restoreRequestProxyCheck();
+};
+
+const runRequestProxyCheck = async (
+  proxyUrl,
+  reason = "settings",
+  { force = false } = {},
+) => {
   resetRequestProxyCheck();
+  const transport = currentRequestProxyTransport();
   checkedRequestProxyUrl = proxyUrl;
+  checkedRequestProxyTransport = transport;
   requestProxyCheckStatus.value = "checking";
 
   const sequence = requestProxyCheckSequence;
-  const controller = new AbortController();
-  requestProxyCheckController = controller;
-  requestProxyCheckTimeoutId = setTimeout(() => {
-    controller.abort();
-  }, REQUEST_PROXY_CHECK_TIMEOUT_MS);
 
   try {
-    await checkRequestProxy(proxyUrl, { signal: controller.signal });
+    const state = await ensureRequestProxyHealth(proxyUrl, {
+      reason,
+      transport,
+      force,
+    });
     if (sequence !== requestProxyCheckSequence) return;
-    requestProxyCheckStatus.value = "success";
+    applyRequestProxyHealthState(state);
   } catch {
     if (sequence !== requestProxyCheckSequence) return;
     requestProxyCheckStatus.value = "error";
-  } finally {
-    if (sequence === requestProxyCheckSequence) {
-      clearRequestProxyCheckResources();
-    }
   }
+};
+
+const restoreRequestProxyCheck = (proxyUrl = loadRequestProxy().url) => {
+  resetRequestProxyCheck();
+  if (!proxyUrl) return;
+
+  const transport = currentRequestProxyTransport();
+  const cached = loadRequestProxyHealth(proxyUrl, { transport });
+  if (cached) {
+    applyRequestProxyHealthState(cached);
+    return;
+  }
+  runRequestProxyCheck(proxyUrl, "restore");
+};
+
+const handleRequestProxyJsonpToggle = () => {
+  requestProxyJsonpEnabled.value = !requestProxyJsonpEnabled.value;
+  saveRequestProxyJsonp(requestProxyJsonpEnabled.value);
+  restoreRequestProxyCheck();
+};
+
+const handleRequestProxyRetry = () => {
+  const proxyUrl = currentDraftRequestProxyUrl();
+  if (!proxyUrl || proxyUrl !== loadRequestProxy().url) {
+    resetRequestProxyCheck();
+    return;
+  }
+  runRequestProxyCheck(proxyUrl, "manual-retry", { force: true });
 };
 
 const handleRequestProxyUrlCommit = (url) => {
@@ -549,18 +646,16 @@ const handleRequestProxyUrlCommit = (url) => {
     resetRequestProxyCheck();
     return;
   }
-  if (
-    checkedRequestProxyUrl === normalizedProxyUrl &&
-    requestProxyCheckStatus.value !== "idle"
-  ) {
-    return;
-  }
 
-  runRequestProxyCheck(normalizedProxyUrl);
+  runRequestProxyCheck(normalizedProxyUrl, "settings");
 };
 
 onBeforeUnmount(() => {
   resetRequestProxyCheck();
+  if (typeof window !== "undefined") {
+    window.removeEventListener(REQUEST_PROXY_HEALTH_EVENT, handleRequestProxyHealthEvent);
+    window.removeEventListener(REQUEST_PROXY_CONFIG_EVENT, handleRequestProxyConfigEvent);
+  }
 });
 
 // localStorage関連の関数
@@ -734,6 +829,65 @@ const clearLocalStorage = () => {
   color: var(--danger);
 }
 
+.proxy-jsonp-toggle {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 5px;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 8px;
+  padding: 3px 6px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  background: transparent;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.proxy-jsonp-toggle:hover {
+  color: var(--text-primary);
+  background: var(--hover-bg);
+}
+
+.proxy-jsonp-toggle:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+.proxy-jsonp-toggle.is-active {
+  color: #17652b;
+  border-color: #17652b;
+  background: transparent;
+}
+
+.proxy-jsonp-indicator {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  font-size: 9px;
+  line-height: 1;
+}
+
+.proxy-jsonp-help {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
 .proxy-check-status {
   position: relative;
   box-sizing: border-box;
@@ -742,7 +896,7 @@ const clearLocalStorage = () => {
   gap: 8px;
   width: fit-content;
   max-width: 100%;
-  margin-top: 12px;
+  margin-top: 10px;
   padding: 9px 12px;
   border: 1px solid transparent;
   border-radius: 8px;
@@ -774,6 +928,30 @@ const clearLocalStorage = () => {
   border-color: var(--danger);
 }
 
+.proxy-check-retry {
+  flex: 0 0 auto;
+  margin-left: 2px;
+  padding: 3px 7px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.25;
+  cursor: pointer;
+}
+
+.proxy-check-retry:hover {
+  background: rgba(204, 0, 0, 0.08);
+}
+
+.proxy-check-retry:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
 .proxy-check-icon {
   display: inline-flex;
   flex: 0 0 auto;
@@ -789,7 +967,7 @@ const clearLocalStorage = () => {
 
 .proxy-check-icon::after {
   color: var(--on-accent);
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 800;
   content: "✓";
 }
@@ -858,6 +1036,12 @@ const clearLocalStorage = () => {
   color: #91e59e;
   background: rgba(77, 180, 92, 0.14);
   border-color: #91e59e;
+}
+
+:global(html.dark-mode) .proxy-jsonp-toggle.is-active {
+  color: #91e59e;
+  border-color: #91e59e;
+  background: transparent;
 }
 
 :global(html.dark-mode) .proxy-check-status-success:focus-visible {

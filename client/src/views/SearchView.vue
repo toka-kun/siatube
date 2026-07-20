@@ -127,8 +127,15 @@ export default {
       } catch (e) {
         console.warn("fetchSearchResults error:", e);
         if (sequence === this.searchSequence) {
-          if (append) this.loadMoreError = "検索結果の追加取得に失敗しました";
-          else this.error = "検索APIの取得に失敗しました";
+          if (append) {
+            this.loadMoreError = e?.connectionFailure
+              ? e.message
+              : "検索結果の追加取得に失敗しました";
+          } else {
+            this.error = e?.connectionFailure
+              ? e.message
+              : "検索APIの取得に失敗しました";
+          }
           if (!append) this.videos = [];
         }
       } finally {

@@ -264,9 +264,11 @@ export default {
       } catch (e) {
         if (sequence !== this.requestSequence) return;
         console.warn("fetchComments error:", e);
-        this.error = append
-          ? "コメントの追加取得に失敗しました"
-          : "コメントの取得に失敗しました";
+        this.error = e?.connectionFailure
+          ? e.message
+          : append
+            ? "コメントの追加取得に失敗しました"
+            : "コメントの取得に失敗しました";
         if (!append) this.comments = [];
       } finally {
         if (sequence === this.requestSequence) {
@@ -363,7 +365,9 @@ export default {
         comment.repliesNextContinuation = data?.nextContinuation || null;
       } catch (error) {
         console.warn("fetchCommentReplies error:", error);
-        comment.repliesError = "返信の取得に失敗しました";
+        comment.repliesError = error?.connectionFailure
+          ? error.message
+          : "返信の取得に失敗しました";
       } finally {
         comment.repliesLoading = false;
       }
