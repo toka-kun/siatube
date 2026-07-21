@@ -1,5 +1,5 @@
 <h1>GAS Webアプリ デプロイ手順</h1>
-
+*クライアントのみの場合静的ウェブサイトを配信できる物ならなんでもOKです
 <h2>コード</h2>
 <pre><code>function doGet() {
   const text = UrlFetchApp.fetch(
