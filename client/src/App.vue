@@ -7,6 +7,29 @@
     />
     <Sidebar :open="sidebarOpen" :is-watch-page="route.path === '/watch'" />
     <main class="app-content" :class="{ 'sidebar-closed': !sidebarOpen }">
+      <div
+        v-if="connectionFailurePrompt"
+        class="proxy-connection-prompt"
+        role="alert"
+      >
+        <div class="proxy-connection-message">
+          <strong>API通信がブロックされている可能性が高いです</strong>
+          <p>接続確認用のJSONを取得できませんでした。ネットワークでフィルタリングされている場合は、プロキシを設定してください。</p>
+        </div>
+        <div class="proxy-connection-actions">
+          <button type="button" class="open-proxy-settings" @click="openProxySettings">
+            プロキシ設定を開く
+          </button>
+          <button
+            type="button"
+            class="dismiss-proxy-prompt"
+            aria-label="プロキシ設定の案内を閉じる"
+            @click="connectionFailurePrompt = false"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
       <router-view />
     </main>
     <SettingsView />
@@ -19,6 +42,7 @@ import SettingsView from '@/views/SettingsView.vue';
 import { ref, computed, provide, watch, onBeforeUnmount } from 'vue';
 import { loadDisplayMode, computeIsDarkFromMode } from '@/utils/settingsManager';
 import { useRoute } from 'vue-router';
+import { API_CONNECTION_FAILURE_EVENT } from '@/services/siatubeApi';
 
 export default {
   name: 'App',
@@ -34,6 +58,7 @@ export default {
     // Initialize sidebarOpen based on screen width (consistent default)
     const sidebarOpen = ref(window.innerWidth >= 1315);
     const settingsModalOpen = ref(false);
+    const connectionFailurePrompt = ref(false);
 
     // Always initialize settingsModalOpen to false on page load
     console.log('[App.vue] Initialized settingsModalOpen to false on page load');
@@ -55,6 +80,17 @@ export default {
       console.log('[App.vue] closeSettingsModal called');
       settingsModalOpen.value = false;
     };
+
+    const handleApiConnectionFailure = () => {
+      connectionFailurePrompt.value = true;
+    };
+
+    const openProxySettings = () => {
+      connectionFailurePrompt.value = false;
+      openSettingsModal();
+    };
+
+    window.addEventListener(API_CONNECTION_FAILURE_EVENT, handleApiConnectionFailure);
 
     // Persist modal state to localStorage whenever it changes
     watch(settingsModalOpen, (newVal) => {
@@ -80,7 +116,10 @@ export default {
       }
     };
     window.addEventListener('storage', handleStorage);
-    onBeforeUnmount(() => window.removeEventListener('storage', handleStorage));
+    onBeforeUnmount(() => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener(API_CONNECTION_FAILURE_EVENT, handleApiConnectionFailure);
+    });
 
     // Update sidebarOpen when viewport resizes across thresholds
     const updateSidebarByWidth = () => {
@@ -125,6 +164,8 @@ export default {
       handleToggleSidebar,
       viewportWidth,
       settingsModalOpen,
+      connectionFailurePrompt,
+      openProxySettings,
     };
   },
   methods: {
@@ -173,6 +214,102 @@ export default {
 .app-content {
   margin-left: 250px;
   transition: margin-left 0.3s ease;
+}
+
+.proxy-connection-prompt {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 14px 16px;
+  padding: 18px 20px;
+  border: 2px solid #d97706;
+  border-left-width: 7px;
+  border-radius: 8px;
+  color: var(--text-primary);
+  background: #fff7ed;
+  box-shadow: 0 4px 16px rgba(217, 119, 6, 0.2);
+}
+
+.proxy-connection-message strong {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #9a3412;
+  font-size: clamp(1.15rem, 2vw, 1.45rem);
+  line-height: 1.35;
+}
+
+.proxy-connection-message strong::before {
+  flex: 0 0 auto;
+  content: "⚠️";
+  font-size: 1.35em;
+}
+
+.proxy-connection-prompt p {
+  margin: 8px 0 0;
+  font-size: 0.96rem;
+  line-height: 1.55;
+}
+
+.proxy-connection-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.open-proxy-settings,
+.dismiss-proxy-prompt {
+  border: none;
+  border-radius: 5px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.open-proxy-settings {
+  padding: 11px 16px;
+  color: var(--on-accent);
+  background: var(--accent-color);
+  font-weight: 600;
+}
+
+html.dark-mode .proxy-connection-prompt {
+  border-color: #fb923c;
+  background: #431b0b;
+  box-shadow: 0 4px 18px rgba(251, 146, 60, 0.18);
+}
+
+html.dark-mode .proxy-connection-message strong {
+  color: #fdba74;
+}
+
+.dismiss-proxy-prompt {
+  padding: 7px 9px;
+  color: var(--text-primary);
+  background: transparent;
+}
+
+.open-proxy-settings:focus-visible,
+.dismiss-proxy-prompt:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+@media (max-width: 600px) {
+  .proxy-connection-prompt {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .proxy-connection-actions {
+    width: 100%;
+  }
+
+  .open-proxy-settings {
+    flex: 1;
+  }
 }
 
 @media (min-width: 1315px) {

@@ -45,6 +45,18 @@
           <small :id="requestProxyHelpId" class="proxy-url-help">
             API通信がプロキシ経由になります。<br>空欄の場合はプロキシされません。
           </small>
+          <div v-if="!requestProxyUrl.trim()" class="proxy-creation-help">
+            <p>プロキシが設定されていません。</p>
+            <button
+              type="button"
+              class="proxy-creation-toggle"
+              :aria-expanded="showProxyCreationGuide ? 'true' : 'false'"
+              :aria-controls="proxyCreationGuideId"
+              @click="showProxyCreationGuide = true"
+            >
+              作り方を表示
+            </button>
+          </div>
           <small
             v-if="requestProxyUrlError"
             :id="requestProxyErrorId"
@@ -239,6 +251,57 @@
         -->
       </div>
     </div>
+
+    <div
+      v-if="showProxyCreationGuide"
+      class="proxy-guide-overlay"
+      @click.self="showProxyCreationGuide = false"
+    >
+      <section
+        :id="proxyCreationGuideId"
+        class="proxy-guide-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="proxyCreationGuideTitleId"
+      >
+        <header class="proxy-guide-header">
+          <h2 :id="proxyCreationGuideTitleId">プロキシの作り方</h2>
+          <button
+            type="button"
+            class="close-button"
+            aria-label="プロキシの作り方を閉じる"
+            @click="showProxyCreationGuide = false"
+          >
+            ✕
+          </button>
+        </header>
+        <div class="proxy-creation-guide">
+          <p>
+            <strong>通常版</strong>
+            <a
+              href="https://script.google.com/home/projects/1ZEA1vMWKdMurwIpTyW_aXuQoTgIwh4muZgtOxukwecVYwERnuBSQC2bo"
+              target="_blank"
+              rel="noopener noreferrer"
+            >Google Apps Scriptを開く</a>
+          </p>
+          <p>
+            <strong>タイプ2</strong>
+            <a
+              href="https://script.google.com/home/projects/1cdOvNbSQBUClgEeBAs8Ver0cbd8OjA-Ps7Fjocjtm98tk9Y7t0g8RHHs"
+              target="_blank"
+              rel="noopener noreferrer"
+            >Google Apps Scriptを開く</a>
+          </p>
+          <iframe
+            class="proxy-creation-preview"
+            src="https://drive.google.com/file/d/1us8c3eK_IMgkDdY1dTfXfevhzykMECfd/preview"
+            title="タイプ2プロキシの作り方"
+            loading="lazy"
+            allow="autoplay"
+          ></iframe>
+        </div>
+      </section>
+    </div>
   </div>
 </template>
 
@@ -285,6 +348,8 @@ const requestProxyInputId = `${settingsViewId}-request-proxy-url`;
 const requestProxyHelpId = `${settingsViewId}-request-proxy-help`;
 const requestProxyErrorId = `${settingsViewId}-request-proxy-error`;
 const requestProxyStatusTooltipId = `${settingsViewId}-request-proxy-status-tooltip`;
+const proxyCreationGuideId = `${settingsViewId}-proxy-creation-guide`;
+const proxyCreationGuideTitleId = `${settingsViewId}-proxy-creation-guide-title`;
 const requestProxySuccessDescription =
   "プロキシを経由して、正しくしあtubeサーバーに接続ができ有効なレスポンスが返って来ました来ました";
 
@@ -296,6 +361,7 @@ const displayMode = ref("device");
 const disableTimeouts = ref(true);
 const preferredQuality = ref("auto");
 const requestProxyUrl = ref("");
+const showProxyCreationGuide = ref(false);
 const requestProxyJsonpEnabled = ref(false);
 const requestProxyCheckStatus = ref("idle");
 let checkedRequestProxyUrl = "";
@@ -461,6 +527,7 @@ const saveBackup = () => {
 };
 
 const closeSettings = () => {
+  showProxyCreationGuide.value = false;
   // 変更は watcher で保存済み
   if (settingsModal?.closeSettingsModal) {
     settingsModal.closeSettingsModal();
@@ -1030,6 +1097,119 @@ const clearLocalStorage = () => {
 
 .proxy-url-help {
   display: block;
+}
+
+.proxy-creation-help {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.proxy-creation-help > p {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+}
+
+.proxy-creation-toggle {
+  padding: 6px 10px;
+  border: 1px solid var(--accent-color);
+  border-radius: 4px;
+  color: var(--accent-color);
+  background: transparent;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.proxy-creation-toggle:hover {
+  background: var(--hover-bg);
+}
+
+.proxy-creation-toggle:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+.proxy-creation-guide {
+  display: grid;
+  gap: 10px;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.proxy-guide-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.62);
+}
+
+.proxy-guide-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(900px, 100%);
+  max-height: calc(100vh - 48px);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+}
+
+.proxy-guide-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.proxy-guide-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.proxy-creation-guide p {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.proxy-creation-guide a {
+  color: var(--accent-color);
+  overflow-wrap: anywhere;
+}
+
+.proxy-creation-preview {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: min(540px, 60vh);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+}
+
+@media (max-width: 600px) {
+  .proxy-guide-overlay {
+    padding: 10px;
+  }
+
+  .proxy-guide-dialog {
+    max-height: calc(100vh - 20px);
+  }
+
+  .proxy-creation-guide {
+    padding: 14px;
+  }
 }
 
 :global(html.dark-mode) .proxy-check-status-success {

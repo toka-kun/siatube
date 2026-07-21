@@ -16,9 +16,49 @@ const DEFAULT_RETRIES = 1;
 const RETRY_DELAY_MS = 250;
 const RATE_LIMIT_RETRY_DELAY_MS = 2_100;
 const STREAM_CACHE_TTL_MS = 5 * 60 * 1_000;
+export const API_CONNECTION_FAILURE_EVENT = "siatube-api-connection-failure";
+const API_HEALTH_URL = `${SIATUBE_API_ORIGIN}/health`;
+const API_HEALTH_TIMEOUT_MS = 10_000;
 
 const streamCache = new Map();
 const streamRequests = new Map();
+let apiHealthProbe = null;
+
+function confirmDirectApiBlock(error) {
+  if (typeof window === "undefined" || apiHealthProbe) return;
+
+  apiHealthProbe = (async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), API_HEALTH_TIMEOUT_MS);
+    let receivedJson = false;
+
+    try {
+      const response = await fetch(API_HEALTH_URL, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        credentials: "omit",
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      const payload = await response.json();
+      receivedJson = response.ok && payload !== null && typeof payload === "object";
+    } catch {
+      receivedJson = false;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+
+    if (!receivedJson) {
+      try {
+        window.dispatchEvent(new CustomEvent(API_CONNECTION_FAILURE_EVENT, {
+          detail: { error, healthUrl: API_HEALTH_URL, healthJsonReceived: false },
+        }));
+      } catch {}
+    }
+  })().finally(() => {
+    apiHealthProbe = null;
+  });
+}
 
 function pruneStreamCache(now = Date.now()) {
   for (const [key, entry] of streamCache) {
@@ -279,6 +319,8 @@ function finalizeRequestError(error, proxyUrl, proxyTransport) {
         ? "JSONPプロキシ経由でしあtubeサーバーに接続できませんでした。JSONPまたはプロキシ設定を確認してください。"
         : "プロキシ経由でしあtubeサーバーに接続できませんでした。プロキシ設定またはネットワーク接続を確認してください。"
       : "しあtubeサーバーに接続できませんでした。ネットワーク接続を確認してください。";
+
+    if (!proxyUsed) confirmDirectApiBlock(finalError);
   }
 
   if (proxyUsed) {
